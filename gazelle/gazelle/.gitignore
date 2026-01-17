@@ -1,7 +1,7 @@
 # data and checkpoint folders
 data/
 checkpoints/
-experiments/
+# experiments/  # 注释掉，允许上传 experiments 目录（但排除 .pt 文件）
 wandb/
 
 # Byte-compiled / optimized / DLL files
