@@ -93,8 +93,8 @@ class SAMImageEncoder(nn.Module):
             lora_dropout=0.1, 
             bias="none"
         )
-        self.image_encoder = get_peft_model(self.image_encoder, peft_config)
-        self.image_encoder.print_trainable_parameters()
+        # self.image_encoder = get_peft_model(self.image_encoder, peft_config)
+        # self.image_encoder.print_trainable_parameters()
 
     def adapt_pos_embed(self, new_img_size):
         old_pos_embed = self.image_encoder.pos_embed.data 
