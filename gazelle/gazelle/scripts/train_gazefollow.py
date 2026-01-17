@@ -21,7 +21,7 @@ parser.add_argument('--model', type=str, default="sam_vitb")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--ckpt_save_dir', type=str, default='./experiments')
 parser.add_argument('--wandb_project', type=str, default='gazelle')
-parser.add_argument('--exp_name', type=str, default='train_sam_vitb_gazefollow')
+parser.add_argument('--exp_name', type=str, default='train_sam_vitb_lora_gazefollow')
 parser.add_argument('--log_iter', type=int, default=10, help='how often to log loss during training')
 parser.add_argument('--max_epochs', type=int, default=15)
 parser.add_argument('--batch_size', type=int, default=60)
@@ -125,8 +125,8 @@ def main():
     model, transform = get_gazelle_model(args.model)
     model.cuda()
 
-    for param in model.backbone.parameters(): # freeze backbone
-        param.requires_grad = False
+    # for param in model.backbone.parameters(): # freeze backbone
+    #     param.requires_grad = False
     
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(f"Learnable parameters: {n_params}")

@@ -33,6 +33,8 @@ class DinoV2Backbone(Backbone):
     def __init__(self, model_name):
         super(DinoV2Backbone, self).__init__()
         self.model = torch.hub.load('facebookresearch/dinov2', model_name)
+        for param in self.model.parameters():
+            param.requires_grad = False
 
     def forward(self, x):
         b, c, h, w = x.shape
@@ -151,16 +153,15 @@ class SAMFusion(nn.Module):
     """
     def __init__(self, checkpoint_path, model_type="vit_b"):
         super().__init__()
+        from segment_anything import sam_model_registry # 确保这里能引用到
         sam_model = sam_model_registry[model_type](checkpoint=checkpoint_path)
         self.transformer = sam_model.mask_decoder.transformer
-        # 需要 pe_layer 来生成 dense positional encoding
         self.pe_layer = sam_model.prompt_encoder.pe_layer 
         
         del sam_model.image_encoder
         del sam_model.prompt_encoder
         del sam_model
         
-        # Fusion 层通常需要训练以适应 Gaze 任务
         for param in self.transformer.parameters():
             param.requires_grad = True
         for param in self.pe_layer.parameters():
@@ -168,8 +169,6 @@ class SAMFusion(nn.Module):
 
     def get_dense_pe(self, image_shape_hw):
         h, w = image_shape_hw
-        # SAM 的 pe_layer 输出是 (C, H, W) 或者是 (H, W, C)? 
-        # 查看源码 pe_layer(size) 返回 (C, H, W)
         return self.pe_layer((h, w)).unsqueeze(0)
 
     def forward(self, image_embeddings, sparse_embeddings):
@@ -180,17 +179,17 @@ class SAMFusion(nn.Module):
         B, C, H, W = image_embeddings.shape
         image_pe = self.get_dense_pe((H, W)).to(image_embeddings.device).repeat(B, 1, 1, 1)
         
-        # TwoWayTransformer 接受:
-        # point_embedding (sparse) 作为 Queries
-        # image_embedding (dense) 作为 Keys/Values
-        # 输出:
-        # sparse_encoded: 更新后的 Prompt query [B, N, C]
-        # dense_encoded: 更新后的 Image feature [B, C, H, W] (这就是我们要的 Heatmap 特征源)
         sparse_encoded, dense_encoded = self.transformer(
             point_embedding=sparse_embeddings,
             image_embedding=image_embeddings, 
             image_pe=image_pe 
         )
+        
+        # === 修复代码 ===
+        # 原代码: dense_encoded = dense_encoded.permute(1, 2, 0).view(B, C, H, W)
+        # 修改为 .reshape()，它会自动处理非连续内存
+        dense_encoded = dense_encoded.permute(1, 2, 0).reshape(B, C, H, W)
+        
         return sparse_encoded, dense_encoded
 
 
