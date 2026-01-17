@@ -13,6 +13,12 @@ INTERVAL=600  # 10分钟 = 600秒
 # 确保在正确的目录
 cd "$REPO_DIR" || exit 1
 
+# 配置 git 用户信息（如果未设置）
+if ! git config user.name > /dev/null 2>&1; then
+    git config user.name "kpqnkkaa"
+    git config user.email "22326665kpqn@gmail.com"
+fi
+
 # 日志函数
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
