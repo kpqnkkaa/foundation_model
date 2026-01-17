@@ -1,0 +1,1 @@
+python train.py --save_dir "/mnt/nvme1n1/lululemon/xjj/result/checkpoints"

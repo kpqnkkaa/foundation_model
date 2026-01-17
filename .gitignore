@@ -1,0 +1,43 @@
+# PyTorch model files
+*.pt
+*.pth
+*.ckpt
+
+# SAM checkpoint
+sam_vit_b_01ec64.pth
+
+# Model outputs
+foudation_model/
+foudation_model_1/
+
+# Temporary files
+*.json
+batch_dict.json
+test_batch_dict.json
+tmp/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+.auto_push.log
+
+# Data
+*.png
+*.jpg
+*.jpeg
+
+# Environment
+environment/
+.conda/
+

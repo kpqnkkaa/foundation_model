@@ -1,0 +1,12 @@
+torch>=2.0.0
+torchvision
+transformers>=4.30.0
+peft>=0.4.0
+pandas
+easydict
+tqdm
+Pillow
+pyyaml
+accelerate
+numpy
+opencv-python
