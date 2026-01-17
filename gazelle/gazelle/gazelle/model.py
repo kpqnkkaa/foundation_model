@@ -19,7 +19,7 @@ class GazeLLE(nn.Module):
         self.inout = inout
         
         # 判定是否为 SAM Backbone
-        self.is_sam = isinstance(backbone, SAMBackboneWrapper)
+        self.is_sam = False
 
         self.linear = nn.Conv2d(backbone.get_dimension(), self.dim, 1)
         self.head_token = nn.Embedding(1, self.dim)
