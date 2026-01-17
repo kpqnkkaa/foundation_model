@@ -5,6 +5,7 @@ from timm.models.vision_transformer import Block
 import math
 import os
 from gazelle.backbone import DinoV2Backbone, SAMBackboneWrapper
+import gazelle.utils as utils
 
 class GazeLLE(nn.Module):
     def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64)):

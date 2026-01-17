@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
+import torch.nn.functional as F
 
 from segment_anything import sam_model_registry
 from peft import LoraConfig, get_peft_model
@@ -67,7 +68,7 @@ class SAMImageEncoder(nn.Module):
         # 加载完整模型提取 Image Encoder
         sam_model = sam_model_registry[model_type](checkpoint=checkpoint_path)
         self.image_encoder = sam_model.image_encoder
-        self.patch_size = sam_model.image_encoder.patch_embed.patch_size[0] # usually 16
+        self.patch_size = sam_model.image_encoder.patch_embed.proj.kernel_size[0] # usually 16
 
         # 调整位置编码
         if img_size != 1024:
