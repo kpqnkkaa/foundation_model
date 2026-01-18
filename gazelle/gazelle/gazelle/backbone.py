@@ -35,12 +35,15 @@ class DinoV2Backbone(Backbone):
         self.model = torch.hub.load('facebookresearch/dinov2', model_name)
         for param in self.model.parameters():
             param.requires_grad = False
+        # 768映射为256
+        self.proj = nn.Linear(768, 256)
 
     def forward(self, x):
         b, c, h, w = x.shape
         out_h, out_w = self.get_out_size((h, w))
         x = self.model.forward_features(x)['x_norm_patchtokens']
         x = x.view(x.size(0), out_h, out_w, -1).permute(0, 3, 1, 2) # "b (out_h out_w) c -> b c out_h out_w"
+        x = self.proj(x)
         return x
     
     def get_dimension(self):
@@ -178,6 +181,8 @@ class SAMFusion(nn.Module):
         """
         B, C, H, W = image_embeddings.shape
         image_pe = self.get_dense_pe((H, W)).to(image_embeddings.device).repeat(B, 1, 1, 1)
+        print(image_pe.shape)
+        print(image_embeddings.shape)
         
         sparse_encoded, dense_encoded = self.transformer(
             point_embedding=sparse_embeddings,
