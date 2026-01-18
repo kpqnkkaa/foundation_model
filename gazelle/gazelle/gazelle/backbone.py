@@ -173,7 +173,7 @@ class SAMFusion(nn.Module):
         del sam_model
         
         for param in self.transformer.parameters():
-            param.requires_grad = False
+            param.requires_grad =False
         for param in self.pe_layer.parameters():
             param.requires_grad = False
 

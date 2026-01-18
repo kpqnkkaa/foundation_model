@@ -64,13 +64,14 @@ class GazeLLE(nn.Module):
         # 1. 提取基础图像特征 [B, C, H, W]
         x = self.backbone.forward(input["images"])
         
+        x = self.linear(x) # [B or Total_People, dim, H, W]
+        x = x + self.pos_embed
+
+        x = utils.repeat_tensors(x, num_ppl_per_img)
+        
         # 2. 特征处理分支 (SAM vs Standard)
         if self.is_sam:
             # === SAM 分支 ===
-            # SAM 需要在 Fusion 前将 Image Features 扩展到 Person 维度，
-            # 这样才能和 Prompt Embedding (也是 Person 维度) 一一对应进行 TwoWayTransformer 交互
-            x = utils.repeat_tensors(x, num_ppl_per_img) # [Total_People, C, H, W]
-
             # 准备 Prompts: 将归一化的 bbox 转换为绝对坐标并 flatten
             flat_bboxes = []
             for i, bbox_list in enumerate(input["bboxes"]):
@@ -91,24 +92,15 @@ class GazeLLE(nn.Module):
             
             # 执行 Fusion (TwoWayTransformer)
             # 输出 dense_encoded: [Total_People, C, H, W] - 这是融合了 Head 位置信息的特征图
-            _, x = self.backbone.fusion(image_embeddings=x, sparse_embeddings=sparse_embeddings)
-                    # 3. 维度投影 (Adapt Dimension)
-            x = self.linear(x) # [B or Total_People, dim, H, W]
-            x = x + self.pos_embed
+            _, head_map_embeddings = self.backbone.fusion(image_embeddings=x, sparse_embeddings=sparse_embeddings)
             
         else:
             # === Standard 分支后续 ===
-            x = self.linear(x) # [B or Total_People, dim, H, W]
-            # 只有非 SAM 模式需要手动扩展特征并叠加 Head Map
-            x = x + self.pos_embed
-            x = utils.repeat_tensors(x, num_ppl_per_img)
-            # num_ppl_per_img 输出全是1
             # print(num_ppl_per_img)
-            
             # 生成并叠加 Head Maps
             head_maps = torch.cat(self.get_input_head_maps(input["bboxes"]), dim=0).to(x.device) 
             head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
-            x = x + head_map_embeddings
+        x = x + head_map_embeddings
 
         # --- 以下逻辑保持不变 ---
         
