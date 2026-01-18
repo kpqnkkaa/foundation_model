@@ -19,8 +19,8 @@ class GazeLLE(nn.Module):
         self.inout = inout
         
         # 判定是否为 SAM Backbone
-        # self.is_sam = isinstance(backbone, SAMBackboneWrapper)
-        self.is_sam = False
+        self.is_sam = isinstance(backbone, SAMBackboneWrapper)
+        # self.is_sam = False
         print("is_sam: ", self.is_sam)
 
         self.linear = nn.Conv2d(backbone.get_dimension(), self.dim, 1)
@@ -85,6 +85,7 @@ class GazeLLE(nn.Module):
                         xmax * self.in_size[1], 
                         ymax * self.in_size[0]
                     ])
+            print(self.in_size)
             
             bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
             
@@ -98,8 +99,11 @@ class GazeLLE(nn.Module):
         else:
             # === Standard 分支后续 ===
             # 只有非 SAM 模式需要手动扩展特征并叠加 Head Map
+            # [30, 256, 28, 28]
             x = x + self.pos_embed
-            x = utils.repeat_tensors(x, num_ppl_per_img) 
+            x = utils.repeat_tensors(x, num_ppl_per_img)
+            # num_ppl_per_img 输出全是1
+            # print(num_ppl_per_img)
             
             # 生成并叠加 Head Maps
             head_maps = torch.cat(self.get_input_head_maps(input["bboxes"]), dim=0).to(x.device) 
