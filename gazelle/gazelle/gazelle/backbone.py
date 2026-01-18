@@ -214,8 +214,8 @@ class SAMBackboneWrapper(Backbone):
         self.in_size = in_size
         
         # 实例化三个组件
-        self.img_encoder = SAMImageEncoder(checkpoint_path, model_type, lora_r, in_size[0])
-        # self.img_encoder = DinoV2Backbone('dinov2_vitb14')
+        # self.img_encoder = SAMImageEncoder(checkpoint_path, model_type, lora_r, in_size[0])
+        self.img_encoder = DinoV2Backbone('dinov2_vitb14')
         self.prompt_encoder = SAMPromptEncoder(checkpoint_path, model_type)
         self.fusion = SAMFusion(checkpoint_path, model_type)
         
