@@ -36,14 +36,14 @@ class DinoV2Backbone(Backbone):
         for param in self.model.parameters():
             param.requires_grad = False
         # [B, 768, H, W]映射为[B, 256, H, W]
-        self.proj = nn.Conv2d(768, 256, kernel_size=1)
+        # self.proj = nn.Conv2d(768, 256, kernel_size=1)
 
     def forward(self, x):
         b, c, h, w = x.shape
         out_h, out_w = self.get_out_size((h, w))
         x = self.model.forward_features(x)['x_norm_patchtokens']
         x = x.view(x.size(0), out_h, out_w, -1).permute(0, 3, 1, 2) # "b (out_h out_w) c -> b c out_h out_w"
-        x = self.proj(x)
+        # x = self.proj(x)
         return x
     
     def get_dimension(self):
@@ -98,6 +98,9 @@ class SAMImageEncoder(nn.Module):
         )
         # self.image_encoder = get_peft_model(self.image_encoder, peft_config)
         # self.image_encoder.print_trainable_parameters()
+
+    def get_dimension(self):
+        return 256
 
     def adapt_pos_embed(self, new_img_size):
         old_pos_embed = self.image_encoder.pos_embed.data 
@@ -216,7 +219,7 @@ class SAMBackboneWrapper(Backbone):
         # 仅用于兼容 Backbone 接口，实际逻辑在 model.py 中显式调用各个组件
         return self.img_encoder(x)
         
-    def get_dimension(self): return 256 # SAM vit_b
+    def get_dimension(self): return self.image_encoder.get_dimension()
     def get_out_size(self, in_size):
         # SAM patch=16
         return (in_size[0] // 16, in_size[1] // 16)

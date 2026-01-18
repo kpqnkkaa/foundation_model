@@ -62,6 +62,10 @@ class GazeLLE(nn.Module):
         
         # 1. 提取基础图像特征 [B, C, H, W]
         x = self.backbone.forward(input["images"])
+
+             # 3. 维度投影 (Adapt Dimension)
+        x = self.linear(x) # [B or Total_People, dim, H, W]
+        x = x + self.pos_embed
         
         # 2. 特征处理分支 (SAM vs Standard)
         if self.is_sam:
@@ -97,15 +101,6 @@ class GazeLLE(nn.Module):
             _, x = self.backbone.fusion(image_embeddings=x, sparse_embeddings=sparse_embeddings)
             
         else:
-            # === DinoV2 / Standard 分支 ===
-            # 此时 x 是 [B, C, H, W]
-            pass # 保持原状，稍后处理
-
-        # 3. 维度投影 (Adapt Dimension)
-        x = self.linear(x) # [B or Total_People, dim, H, W]
-        x = x + self.pos_embed
-
-        if not self.is_sam:
             # === Standard 分支后续 ===
             # 只有非 SAM 模式需要手动扩展特征并叠加 Head Map
             x = utils.repeat_tensors(x, num_ppl_per_img) 
