@@ -66,7 +66,6 @@ class GazeLLE(nn.Module):
 
         # 3. 维度投影 (Adapt Dimension)
         x = self.linear(x) # [B or Total_People, dim, H, W]
-        x = x + self.pos_embed
         
         # 2. 特征处理分支 (SAM vs Standard)
         if self.is_sam:
@@ -96,10 +95,12 @@ class GazeLLE(nn.Module):
             # 执行 Fusion (TwoWayTransformer)
             # 输出 dense_encoded: [Total_People, C, H, W] - 这是融合了 Head 位置信息的特征图
             _, x = self.backbone.fusion(image_embeddings=x, sparse_embeddings=sparse_embeddings)
+            x = x + self.pos_embed
             
         else:
             # === Standard 分支后续 ===
             # 只有非 SAM 模式需要手动扩展特征并叠加 Head Map
+            x = x + self.pos_embed
             x = utils.repeat_tensors(x, num_ppl_per_img)
             # num_ppl_per_img 输出全是1
             # print(num_ppl_per_img)
