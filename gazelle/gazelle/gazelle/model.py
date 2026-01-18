@@ -66,6 +66,7 @@ class GazeLLE(nn.Module):
 
         # 3. 维度投影 (Adapt Dimension)
         x = self.linear(x) # [B or Total_People, dim, H, W]
+        x = x + self.pos_embed
         
         # 2. 特征处理分支 (SAM vs Standard)
         if self.is_sam:
@@ -85,7 +86,7 @@ class GazeLLE(nn.Module):
                         xmax * self.in_size[1], 
                         ymax * self.in_size[0]
                     ])
-            print(self.in_size)
+            # print(self.in_size)
             
             bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
             
@@ -99,8 +100,6 @@ class GazeLLE(nn.Module):
         else:
             # === Standard 分支后续 ===
             # 只有非 SAM 模式需要手动扩展特征并叠加 Head Map
-            # [30, 256, 28, 28]
-            x = x + self.pos_embed
             x = utils.repeat_tensors(x, num_ppl_per_img)
             # num_ppl_per_img 输出全是1
             # print(num_ppl_per_img)
