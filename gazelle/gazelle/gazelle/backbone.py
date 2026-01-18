@@ -102,6 +102,10 @@ class SAMImageEncoder(nn.Module):
     def get_dimension(self):
         return 256
 
+    def get_out_size(self, in_size):
+        h, w = in_size
+        return (h // self.patch_size, w // self.patch_size)
+
     def adapt_pos_embed(self, new_img_size):
         old_pos_embed = self.image_encoder.pos_embed.data 
         patch_size = 16 
@@ -133,8 +137,8 @@ class SAMPromptEncoder(nn.Module):
         
         # # 通常 Prompt Encoder 不需要训练，或者是跟随整体微调
         # # 如果需要训练，确保 requires_grad = True
-        # for param in self.prompt_encoder.parameters():
-        #     param.requires_grad = False # 保持冻结，或者是 True 取决于你的策略
+        for param in self.prompt_encoder.parameters():
+            param.requires_grad = False # 保持冻结，或者是 True 取决于你的策略
 
     def forward(self, bboxes, device):
         """
@@ -168,8 +172,8 @@ class SAMFusion(nn.Module):
         del sam_model.prompt_encoder
         del sam_model
         
-        for param in self.transformer.parameters():
-            param.requires_grad = True
+        # for param in self.transformer.parameters():
+        #     param.requires_grad = True
         for param in self.pe_layer.parameters():
             param.requires_grad = False
 
@@ -210,8 +214,8 @@ class SAMBackboneWrapper(Backbone):
         self.in_size = in_size
         
         # 实例化三个组件
-        # self.img_encoder = SAMImageEncoder(checkpoint_path, model_type, lora_r, in_size[0])
-        self.img_encoder = DinoV2Backbone('dinov2_vitb14')
+        self.img_encoder = SAMImageEncoder(checkpoint_path, model_type, lora_r, in_size[0])
+        # self.img_encoder = DinoV2Backbone('dinov2_vitb14')
         self.prompt_encoder = SAMPromptEncoder(checkpoint_path, model_type)
         self.fusion = SAMFusion(checkpoint_path, model_type)
         
@@ -223,7 +227,8 @@ class SAMBackboneWrapper(Backbone):
     def get_out_size(self, in_size):
         # SAM patch=16
         # return (in_size[0] // 16, in_size[1] // 16)
-        return 32, 32
+        # return 32, 32
+        return self.img_encoder.get_out_size(in_size)
     
     def get_transform(self, in_size):
         return transforms.Compose([
