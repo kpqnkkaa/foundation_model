@@ -1,4 +1,0 @@
-2026-01-18 11:08:55,145 - Experiment Config: {'model': 'sam_vitb', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'ckpt_save_dir': './experiments', 'wandb_project': 'gazelle', 'exp_name': 'train_gazelle_dinov2_vitb_sam_prompt_gazefollow', 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
-2026-01-18 11:08:59,366 - Learnable parameters: 6118016
-2026-01-18 11:09:01,102 - 
-[Epoch 0 Training]

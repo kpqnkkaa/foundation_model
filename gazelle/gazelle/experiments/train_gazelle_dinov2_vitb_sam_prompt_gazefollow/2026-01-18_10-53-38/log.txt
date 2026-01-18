@@ -1,1 +1,0 @@
-2026-01-18 10:53:38,353 - Experiment Config: {'model': 'sam_vitb', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'ckpt_save_dir': './experiments', 'wandb_project': 'gazelle', 'exp_name': 'train_gazelle_dinov2_vitb_sam_prompt_gazefollow', 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
