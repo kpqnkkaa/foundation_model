@@ -1,0 +1,6 @@
+Results for model: sam_vitb
+Checkpoint: ./experiments/train_gazelle_sam_vitb_gazefollow/2026-01-18_01-04-14/best.pt
+----------------------------
+AUC: 0.9378
+Avg L2: 0.1492
+Min L2: 0.0813
