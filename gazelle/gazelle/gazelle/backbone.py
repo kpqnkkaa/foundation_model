@@ -222,7 +222,8 @@ class SAMBackboneWrapper(Backbone):
     def get_dimension(self): return self.img_encoder.get_dimension()
     def get_out_size(self, in_size):
         # SAM patch=16
-        return (in_size[0] // 16, in_size[1] // 16)
+        # return (in_size[0] // 16, in_size[1] // 16)
+        return 32, 32
     
     def get_transform(self, in_size):
         return transforms.Compose([
