@@ -219,7 +219,7 @@ class SAMBackboneWrapper(Backbone):
         # 仅用于兼容 Backbone 接口，实际逻辑在 model.py 中显式调用各个组件
         return self.img_encoder(x)
         
-    def get_dimension(self): return self.image_encoder.get_dimension()
+    def get_dimension(self): return self.img_encoder.get_dimension()
     def get_out_size(self, in_size):
         # SAM patch=16
         return (in_size[0] // 16, in_size[1] // 16)
