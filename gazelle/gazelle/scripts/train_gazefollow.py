@@ -144,11 +144,11 @@ def main():
 
     loss_fn = nn.BCELoss()
     # 在 main 函数中定义 optimizer
-    # 将 Fusion 层的参数学习率设低一点 (例如 1e-4)，Head 设高一点 (1e-3)
-    param_dicts = [
-        {"params": [p for n, p in model.named_parameters() if "fusion" in n and p.requires_grad], "lr": args.lr * 0.1},
-        {"params": [p for n, p in model.named_parameters() if "fusion" not in n and p.requires_grad], "lr": args.lr},
-    ]
+    # # 将 Fusion 层的参数学习率设低一点 (例如 1e-4)，Head 设高一点 (1e-3)
+    # param_dicts = [
+    #     {"params": [p for n, p in model.named_parameters() if "fusion" in n and p.requires_grad], "lr": args.lr * 0.1},
+    #     {"params": [p for n, p in model.named_parameters() if "fusion" not in n and p.requires_grad], "lr": args.lr},
+    # ]
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs, eta_min=1e-7)
 
