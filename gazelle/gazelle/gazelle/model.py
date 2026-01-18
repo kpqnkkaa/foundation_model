@@ -77,18 +77,13 @@ class GazeLLE(nn.Module):
             flat_bboxes = []
             for i, bbox_list in enumerate(input["bboxes"]):
                 for bbox in bbox_list:
-                    # SAM prompt encoder expect absolute coordinates
-                    if bbox is None: 
-                        # 如果没有 bbox，给一个全图或者是 dummy box (视具体逻辑而定，这里假设给全图)
-                        flat_bboxes.append([0, 0, self.in_size[1], self.in_size[0]]) 
-                    else:
-                        xmin, ymin, xmax, ymax = bbox
-                        flat_bboxes.append([
-                            xmin * self.in_size[1], 
-                            ymin * self.in_size[0], 
-                            xmax * self.in_size[1], 
-                            ymax * self.in_size[0]
-                        ])
+                    xmin, ymin, xmax, ymax = bbox
+                    flat_bboxes.append([
+                        xmin * self.in_size[1], 
+                        ymin * self.in_size[0], 
+                        xmax * self.in_size[1], 
+                        ymax * self.in_size[0]
+                    ])
             
             bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
             
