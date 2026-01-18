@@ -195,3 +195,10 @@
 2026-01-18 17:53:39,528 - End of Epoch 0 Train - Avg Loss: 0.0691
 2026-01-18 17:53:39,551 - Saved last checkpoint to ./experiments/train_gazelle_dinov2_vitb_sam_prompt_gazefollow/2026-01-18_17-44-36/last.pt
 2026-01-18 17:53:39,551 - [Epoch 0 Evaluation]
+2026-01-18 17:56:43,780 - EVAL EPOCH 0: AUC=0.6359, Min L2=0.2335, Avg L2=0.3005
+2026-01-18 17:56:43,795 - New best performance! Saved best checkpoint to ./experiments/train_gazelle_dinov2_vitb_sam_prompt_gazefollow/2026-01-18_17-44-36/best.pt
+2026-01-18 17:56:43,796 - 
+[Epoch 1 Training]
+2026-01-18 17:56:45,170 - Iter 0/1891, Loss=0.0684
+2026-01-18 17:56:48,165 - Iter 10/1891, Loss=0.0686
+2026-01-18 17:56:51,205 - Iter 20/1891, Loss=0.0684
