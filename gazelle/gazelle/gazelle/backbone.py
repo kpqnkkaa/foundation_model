@@ -190,10 +190,10 @@ class SAMFusion(nn.Module):
         h, w = image_shape_hw
         return self.pe_layer((h, w)).unsqueeze(0)
 
-    def forward(self, image_embeddings, sparse_embeddings):
+    def forward(self, image_embeddings, tokens):
         """
         image_embeddings: [B, 256, H, W]
-        sparse_embeddings: [B, N, 256]
+        tokens: [B, N, 256]
         """
         B, C, H, W = image_embeddings.shape
         image_pe = self.get_dense_pe((H, W)).to(image_embeddings.device).repeat(B, 1, 1, 1)
@@ -201,7 +201,7 @@ class SAMFusion(nn.Module):
         # print(image_embeddings.shape)
         
         sparse_encoded, dense_encoded = self.transformer(
-            point_embedding=sparse_embeddings,
+            point_embedding=tokens,
             image_embedding=image_embeddings, 
             image_pe=image_pe 
         )
