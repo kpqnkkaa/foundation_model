@@ -73,8 +73,7 @@ class GazeLLE(nn.Module):
         
         # 2. 特征处理分支 (SAM vs Standard)
         if self.is_sam:
-            head_maps = torch.cat(self.get_input_head_maps(input["bboxes"]), dim=0).to(x.device) 
-            head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
+            pass 
             # # === SAM 分支 ===
             # # 准备 Prompts: 将归一化的 bbox 转换为绝对坐标并 flatten
             # flat_bboxes = []
