@@ -30,13 +30,22 @@ class Backbone(nn.Module, ABC):
 
 # Official DINOv2 backbones from torch hub (https://github.com/facebookresearch/dinov2#pretrained-backbones-via-pytorch-hub)
 class DinoV2Backbone(Backbone):
-    def __init__(self, model_name):
+    def __init__(self, model_name, lora_r=8):
         super(DinoV2Backbone, self).__init__()
         self.model = torch.hub.load('facebookresearch/dinov2', model_name)
         for param in self.model.parameters():
             param.requires_grad = False
         # [B, 768, H, W]映射为[B, 256, H, W]
         # self.proj = nn.Conv2d(768, 256, kernel_size=1)
+        peft_config = LoraConfig(
+            r=lora_r, 
+            lora_alpha=lora_r * 2, 
+            target_modules=["qkv"],  # SAM ViT 中的 attention 投影层通常叫 qkv
+            lora_dropout=0.1, 
+            bias="none"
+        )   
+        self.model = get_peft_model(self.model, peft_config)
+        self.model.print_trainable_parameters()
 
     def forward(self, x):
         b, c, h, w = x.shape
