@@ -138,7 +138,7 @@ class SAMPromptEncoder(nn.Module):
         # # 通常 Prompt Encoder 不需要训练，或者是跟随整体微调
         # # 如果需要训练，确保 requires_grad = True
         for param in self.prompt_encoder.parameters():
-            param.requires_grad = False # 保持冻结，或者是 True 取决于你的策略
+            param.requires_grad = True # 保持冻结，或者是 True 取决于你的策略
 
     def forward(self, bboxes, device):
         """
