@@ -1,0 +1,6 @@
+Results for model: sam_vitb
+Checkpoint: ./experiments/train_gazelle_dinov2_vitb_sam_prompt_gazefollow/2026-01-19_16-14-52/last.pt
+----------------------------
+AUC: 0.8627
+Avg L2: 0.2370
+Min L2: 0.1656
