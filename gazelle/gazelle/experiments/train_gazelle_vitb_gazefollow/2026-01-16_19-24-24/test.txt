@@ -1,6 +1,6 @@
 Results for model: gazelle_dinov2_vitb14
-Checkpoint: ./experiments/train_gazelle_vitb_gazefollow/2026-01-16_19-24-24/best.pt
+Checkpoint: ./experiments/train_gazelle_vitb_gazefollow/2026-01-16_19-24-24/last.pt
 ----------------------------
-AUC: 0.9552
-Avg L2: 0.1059
+AUC: 0.9553
+Avg L2: 0.1060
 Min L2: 0.0474

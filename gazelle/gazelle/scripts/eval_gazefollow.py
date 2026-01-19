@@ -14,8 +14,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_path", type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
-parser.add_argument("--model_name", type=str, default="sam_vitb")
-parser.add_argument("--ckpt_path", type=str, default="./experiments/train_gazelle_dinov2_vitb_sam_prompt_gazefollow/2026-01-19_19-09-32/last.pt")
+parser.add_argument("--model_name", type=str, default="gazelle_dinov2_vitb14")
+parser.add_argument("--ckpt_path", type=str, default="./experiments/train_gazelle_vitb_gazefollow/2026-01-16_19-24-24/last.pt")
 parser.add_argument("--batch_size", type=int, default=128)
 parser.add_argument("--output_file", type=str, default="test.txt", help="Path to save the output results")
 args = parser.parse_args()
