@@ -22,6 +22,8 @@ class GazeLLE(nn.Module):
         self.is_sam = isinstance(backbone, SAMBackboneWrapper)
         # self.is_sam = False
         print("is_sam: ", self.is_sam)
+        if self.is_sam:
+            self.fusion_scale = nn.Parameter(torch.zeros(1)) # 初始化为0，或者很小的值
 
         self.linear = nn.Conv2d(backbone.get_dimension(), self.dim, 1)
         self.head_token = nn.Embedding(1, self.dim)
@@ -93,14 +95,14 @@ class GazeLLE(nn.Module):
             # 执行 Fusion (TwoWayTransformer)
             # 输出 dense_encoded: [Total_People, C, H, W] - 这是融合了 Head 位置信息的特征图
             _, head_map_embeddings = self.backbone.fusion(image_embeddings=x, sparse_embeddings=sparse_embeddings)
-            
+            x = x + (self.fusion_scale * head_map_embeddings)
         else:
             # === Standard 分支后续 ===
             # print(num_ppl_per_img)
             # 生成并叠加 Head Maps
             head_maps = torch.cat(self.get_input_head_maps(input["bboxes"]), dim=0).to(x.device) 
             head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
-        x = x + head_map_embeddings
+            x = x + head_map_embeddings
 
         # --- 以下逻辑保持不变 ---
         
