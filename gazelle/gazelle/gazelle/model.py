@@ -73,29 +73,31 @@ class GazeLLE(nn.Module):
         
         # 2. 特征处理分支 (SAM vs Standard)
         if self.is_sam:
-            # === SAM 分支 ===
-            # 准备 Prompts: 将归一化的 bbox 转换为绝对坐标并 flatten
-            flat_bboxes = []
-            for i, bbox_list in enumerate(input["bboxes"]):
-                for bbox in bbox_list:
-                    xmin, ymin, xmax, ymax = bbox
-                    flat_bboxes.append([
-                        xmin * self.in_size[1], 
-                        ymin * self.in_size[0], 
-                        xmax * self.in_size[1], 
-                        ymax * self.in_size[0]
-                    ])
-            # print(self.in_size)
+            head_maps = torch.cat(self.get_input_head_maps(input["bboxes"]), dim=0).to(x.device) 
+            head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
+            # # === SAM 分支 ===
+            # # 准备 Prompts: 将归一化的 bbox 转换为绝对坐标并 flatten
+            # flat_bboxes = []
+            # for i, bbox_list in enumerate(input["bboxes"]):
+            #     for bbox in bbox_list:
+            #         xmin, ymin, xmax, ymax = bbox
+            #         flat_bboxes.append([
+            #             xmin * self.in_size[1], 
+            #             ymin * self.in_size[0], 
+            #             xmax * self.in_size[1], 
+            #             ymax * self.in_size[0]
+            #         ])
+            # # print(self.in_size)
             
-            bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
+            # bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
             
-            # 获取 Prompt Embeddings [Total_People, N_sparse, C]
-            sparse_embeddings = self.backbone.prompt_encoder(bboxes_tensor, device=x.device)
+            # # 获取 Prompt Embeddings [Total_People, N_sparse, C]
+            # sparse_embeddings = self.backbone.prompt_encoder(bboxes_tensor, device=x.device)
             
-            # 执行 Fusion (TwoWayTransformer)
-            # 输出 dense_encoded: [Total_People, C, H, W] - 这是融合了 Head 位置信息的特征图
-            _, head_map_embeddings = self.backbone.fusion(image_embeddings=x, sparse_embeddings=sparse_embeddings)
-            x = x + (self.fusion_scale * head_map_embeddings)
+            # # 执行 Fusion (TwoWayTransformer)
+            # # 输出 dense_encoded: [Total_People, C, H, W] - 这是融合了 Head 位置信息的特征图
+            # _, head_map_embeddings = self.backbone.fusion(image_embeddings=x, sparse_embeddings=sparse_embeddings)
+            # x = x + (self.fusion_scale * head_map_embeddings)
         else:
             # === Standard 分支后续 ===
             # print(num_ppl_per_img)
