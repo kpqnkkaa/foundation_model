@@ -100,11 +100,7 @@ class GazeLLE(nn.Module):
         num_ppl_per_img = [len(bbox_list) for bbox_list in input["bboxes"]]
         
         # 1. 提取基础图像特征 [B, C, H, W]
-        x = self.backbone.forward(input["images"]) 
-
-        # 将 Batch 维度展开为 Total_People 维度
-        # x becomes: [Total_People, dim, H, W]
-        x = utils.repeat_tensors(x, num_ppl_per_img)
+        x = self.backbone.forward(input["images"])
         
         heatmap_preds = []
         inout_preds = None
@@ -113,6 +109,9 @@ class GazeLLE(nn.Module):
         #              SAM 逻辑分支
         # ==========================================
         if self.is_sam:
+            # 将 Batch 维度展开为 Total_People 维度
+            # x becomes: [Total_People, dim, H, W]
+            x = utils.repeat_tensors(x, num_ppl_per_img)
             # A. 准备 Prompts (将归一化 bbox 转为绝对坐标)
             flat_bboxes = []
             for bbox_list in input["bboxes"]:
@@ -189,6 +188,9 @@ class GazeLLE(nn.Module):
         else:
             x = self.linear(x) # [B, dim, H, W]
             x = x + self.pos_embed
+            
+            x = utils.repeat_tensors(x, num_ppl_per_img)
+            
             # A. 叠加 Head Maps
             head_maps = torch.cat(self.get_input_head_maps(input["bboxes"]), dim=0).to(x.device) 
             head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
