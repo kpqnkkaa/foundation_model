@@ -20,10 +20,9 @@ class GazeLLE(nn.Module):
         
         # 判定是否为 SAM Backbone
         self.is_sam = isinstance(backbone, SAMBackboneWrapper)
-        # self.is_sam = False
-        print("is_sam: ", self.is_sam)
         if self.is_sam:
-            self.fusion_scale = nn.Parameter(torch.zeros(1)) # 初始化为0，或者很小的值
+            if self.inout:
+                self.mask_tokens = nn.Embedding(1, self.dim)
 
         self.linear = nn.Conv2d(backbone.get_dimension(), self.dim, 1)
         self.head_token = nn.Embedding(1, self.dim)
@@ -73,26 +72,31 @@ class GazeLLE(nn.Module):
         
         # 2. 特征处理分支 (SAM vs Standard)
         if self.is_sam:
-            pass 
             # # === SAM 分支 ===
-            # # 准备 Prompts: 将归一化的 bbox 转换为绝对坐标并 flatten
-            # flat_bboxes = []
-            # for i, bbox_list in enumerate(input["bboxes"]):
-            #     for bbox in bbox_list:
-            #         xmin, ymin, xmax, ymax = bbox
-            #         flat_bboxes.append([
-            #             xmin * self.in_size[1], 
-            #             ymin * self.in_size[0], 
-            #             xmax * self.in_size[1], 
-            #             ymax * self.in_size[0]
-            #         ])
+            # 准备 Prompts: 将归一化的 bbox 转换为绝对坐标并 flatten
+            flat_bboxes = []
+            for i, bbox_list in enumerate(input["bboxes"]):
+                for bbox in bbox_list:
+                    xmin, ymin, xmax, ymax = bbox
+                    flat_bboxes.append([
+                        xmin * self.in_size[1], 
+                        ymin * self.in_size[0], 
+                        xmax * self.in_size[1], 
+                        ymax * self.in_size[0]
+                    ])
             # # print(self.in_size)
             
-            # bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
+            bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
             
-            # # 获取 Prompt Embeddings [Total_People, N_sparse, C]
-            # sparse_embeddings = self.backbone.prompt_encoder(bboxes_tensor, device=x.device)
+            # 获取 Prompt Embeddings [Total_People, N_sparse, C]
+            sparse_embeddings = self.backbone.prompt_encoder(bboxes_tensor, device=x.device)
             
+            # 准备token
+            if self.inout:
+                x = torch.cat([self.inout_token.weight.unsqueeze(dim=0).repeat(x.shape[0], 1, 1), x], dim=1)
+            # mask tokens
+
+
             # # 执行 Fusion (TwoWayTransformer)
             # # 输出 dense_encoded: [Total_People, C, H, W] - 这是融合了 Head 位置信息的特征图
             # _, head_map_embeddings = self.backbone.fusion(image_embeddings=x, sparse_embeddings=sparse_embeddings)
@@ -105,15 +109,11 @@ class GazeLLE(nn.Module):
             head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
             x = x + head_map_embeddings
 
-        # --- 以下逻辑保持不变 ---
-        
-        # Flatten for Transformer: "b c h w -> b (h w) c"
-        x = x.flatten(start_dim=2).permute(0, 2, 1)
-
-        if self.inout:
-            x = torch.cat([self.inout_token.weight.unsqueeze(dim=0).repeat(x.shape[0], 1, 1), x], dim=1)
-
-        x = self.transformer(x)
+            # Flatten for Transformer: "b c h w -> b (h w) c"
+            x = x.flatten(start_dim=2).permute(0, 2, 1)
+            if self.inout:
+                x = torch.cat([self.inout_token.weight.unsqueeze(dim=0).repeat(x.shape[0], 1, 1), x], dim=1)
+            x = self.transformer(x)
 
         if self.inout:
             inout_tokens = x[:, 0, :] 
