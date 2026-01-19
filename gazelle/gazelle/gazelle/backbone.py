@@ -176,6 +176,7 @@ class SAMFusion(nn.Module):
         sam_model = sam_model_registry[model_type](checkpoint=checkpoint_path)
         self.transformer = sam_model.mask_decoder.transformer
         self.pe_layer = sam_model.prompt_encoder.pe_layer 
+        self.output_hypernetworks_mlps = sam_model.mask_decoder.output_hypernetworks_mlps
         
         del sam_model.image_encoder
         del sam_model.prompt_encoder
@@ -212,7 +213,6 @@ class SAMFusion(nn.Module):
         dense_encoded = dense_encoded.permute(1, 2, 0).reshape(B, C, H, W)
         
         return sparse_encoded, dense_encoded
-
 
 # --- Wrapper Class for Model Compatibility ---
 class SAMBackboneWrapper(Backbone):

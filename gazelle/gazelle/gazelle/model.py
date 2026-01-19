@@ -13,69 +13,111 @@ class GazeLLE(nn.Module):
         self.backbone = backbone
         self.dim = dim
         self.num_layers = num_layers
+        
+        # 获取 Backbone 输出特征图尺寸 (例如 448输入 -> 14x14 或 28x28)
         self.featmap_h, self.featmap_w = backbone.get_out_size(in_size)
+        
         self.in_size = in_size
         self.out_size = out_size
         self.inout = inout
         
-        # 判定是否为 SAM Backbone
-        self.is_sam = isinstance(backbone, SAMBackboneWrapper)
-        if self.is_sam:
-            if self.inout:
-                self.mask_tokens = nn.Embedding(1, self.dim)
+        # 1. 判定是否为 SAM Backbone
+        # 依赖于 backbone.py 中的定义，或者 getattr 检查
+        self.is_sam = getattr(backbone, 'is_sam', False)
 
+        # 2. 基础组件 (所有模式共用)
+        # 将 Backbone 特征 (如 DINOv2 的 768) 投影到模型维度 (256)
         self.linear = nn.Conv2d(backbone.get_dimension(), self.dim, 1)
-        self.head_token = nn.Embedding(1, self.dim)
         
-        # Positional Embedding
-        self.register_buffer("pos_embed", positionalencoding2d(self.dim, self.featmap_h, self.featmap_w).squeeze(dim=0).squeeze(dim=0))
-        
-        if self.inout: self.inout_token = nn.Embedding(1, self.dim)
-        
-        self.transformer = nn.Sequential(*[
-            Block(
-                dim=self.dim, 
-                num_heads=8, 
-                mlp_ratio=4, 
-                drop_path=0.1)
+        # 位置编码
+        self.register_buffer("pos_embed", positionalencoding2d(self.dim, self.featmap_h, self.featmap_w))
+
+        # 3. 分支逻辑构建
+        if self.is_sam:
+            # ================= SAM 分支初始化 =================
+            # Tokens: 如果有 inout，则需要 2 个 token [InOut, Heatmap]，否则 1 个 [Heatmap]
+            self.num_mask_tokens = 2 if self.inout else 1
+            self.mask_tokens = nn.Embedding(self.num_mask_tokens, self.dim)
+            
+            # Upscaling Head: 
+            # 负责将融合后的图像特征 (256维) 上采样并降维到 32维
+            # 这里的 32维 必须与 SAM 预训练 MLP 输出的权重维度一致
+            self.output_upscaling = nn.Sequential(
+                nn.ConvTranspose2d(dim, dim // 4, kernel_size=2, stride=2),
+                nn.LayerNorm([dim // 4, self.featmap_h * 2, self.featmap_w * 2]),
+                nn.GELU(),
+                nn.ConvTranspose2d(dim // 4, dim // 8, kernel_size=2, stride=2),
+                nn.GELU(),
+            )
+            # 注意：这里不再初始化 MLP，因为我们会直接使用 backbone.fusion 里的预训练 MLP
+
+            # InOut 分类头 (如果需要)
+            if self.inout:
+                 self.inout_head = nn.Sequential(
+                    nn.Linear(self.dim, 128),
+                    nn.ReLU(),
+                    nn.Dropout(0.1),
+                    nn.Linear(128, 1),
+                    nn.Sigmoid()
+                )
+
+        else:
+            # ================= Standard 分支初始化 =================
+            self.head_token = nn.Embedding(1, self.dim)
+            if self.inout: 
+                self.inout_token = nn.Embedding(1, self.dim)
+            
+            # 标准 Transformer Decoder
+            self.transformer = nn.Sequential(*[
+                Block(
+                    dim=self.dim, 
+                    num_heads=8, 
+                    mlp_ratio=4, 
+                    drop_path=0.1)
                 for i in range(num_layers)
-                ])
-        
-        self.heatmap_head = nn.Sequential(
-            nn.ConvTranspose2d(dim, dim, kernel_size=2, stride=2),
-            nn.Conv2d(dim, 1, kernel_size=1, bias=False),
-            nn.Sigmoid()
-        )
-        
-        if self.inout: 
-            self.inout_head = nn.Sequential(
-                nn.Linear(self.dim, 128),
-                nn.ReLU(),
-                nn.Dropout(0.1),
-                nn.Linear(128, 1),
+            ])
+            
+            # 简单的反卷积头生成 Heatmap
+            self.heatmap_head = nn.Sequential(
+                nn.ConvTranspose2d(dim, dim, kernel_size=2, stride=2),
+                nn.Conv2d(dim, 1, kernel_size=1, bias=False),
                 nn.Sigmoid()
             )
+            
+            if self.inout: 
+                self.inout_head = nn.Sequential(
+                    nn.Linear(self.dim, 128),
+                    nn.ReLU(),
+                    nn.Dropout(0.1),
+                    nn.Linear(128, 1),
+                    nn.Sigmoid()
+                )
 
     def forward(self, input):
         # input["images"]: [B, 3, H, W]
         # input["bboxes"]: list of lists of bbox tuples (normalized 0-1)
-
+        
         num_ppl_per_img = [len(bbox_list) for bbox_list in input["bboxes"]]
         
         # 1. 提取基础图像特征 [B, C, H, W]
-        x = self.backbone.forward(input["images"])
-        
-        x = self.linear(x) # [B or Total_People, dim, H, W]
+        x = self.backbone.forward(input["images"]) 
+        x = self.linear(x) # [B, dim, H, W]
         x = x + self.pos_embed
 
+        # 将 Batch 维度展开为 Total_People 维度
+        # x becomes: [Total_People, dim, H, W]
         x = utils.repeat_tensors(x, num_ppl_per_img)
         
-        # 2. 特征处理分支 (SAM vs Standard)
+        heatmap_preds = []
+        inout_preds = None
+
+        # ==========================================
+        #              SAM 逻辑分支
+        # ==========================================
         if self.is_sam:
-            # # === SAM 分支 ===
-            # 准备 Prompts: 将归一化的 bbox 转换为绝对坐标并 flatten
+            # A. 准备 Prompts (将归一化 bbox 转为绝对坐标)
             flat_bboxes = []
-            for i, bbox_list in enumerate(input["bboxes"]):
+            for bbox_list in input["bboxes"]:
                 for bbox in bbox_list:
                     xmin, ymin, xmax, ymax = bbox
                     flat_bboxes.append([
@@ -84,50 +126,103 @@ class GazeLLE(nn.Module):
                         xmax * self.in_size[1], 
                         ymax * self.in_size[0]
                     ])
-            # # print(self.in_size)
             
+            # [Total_People, 4]
             bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
             
-            # 获取 Prompt Embeddings [Total_People, N_sparse, C]
+            # B. 获取 Sparse Embeddings (通过 Backbone 的 Prompt Encoder)
+            # [Total_People, N_sparse, dim]
             sparse_embeddings = self.backbone.prompt_encoder(bboxes_tensor, device=x.device)
             
-            # 准备token
+            # C. 准备 Learnable Tokens
+            # tokens: [Total_People, Num_Tokens, dim]
+            tokens = self.mask_tokens.weight.unsqueeze(0).repeat(x.shape[0], 1, 1)
+            # 拼接: [Tokens, Sparse_Prompts]
+            tokens = torch.cat((tokens, sparse_embeddings), dim=1)
+
+            # D. Two-Way Fusion (双向交互)
+            # src: 更新后的图像特征 [Total_People, dim, H, W]
+            # hs:  更新后的 Tokens [Total_People, N_total, dim]
+            # 注意：确保 backbone.py 中的 SAMFusion 返回顺序也是 (image, tokens)
+            src, hs = self.backbone.fusion(image_embeddings=x, tokens=tokens)
+            
+            # E. 提取 Token 进行预测
             if self.inout:
-                x = torch.cat([self.inout_token.weight.unsqueeze(dim=0).repeat(x.shape[0], 1, 1), x], dim=1)
-            # mask tokens
+                # 约定: token 0 是 InOut, token 1 是 Heatmap
+                inout_token_out = hs[:, 0, :] 
+                heatmap_token_out = hs[:, 1, :]
+                
+                # 预测 InOut
+                inout_preds_flat = self.inout_head(inout_token_out).squeeze(dim=-1)
+                inout_preds = utils.split_tensors(inout_preds_flat, num_ppl_per_img)
+            else:
+                # 只有 Heatmap Token
+                heatmap_token_out = hs[:, 0, :]
 
+            # F. 生成 Heatmap (Hypernetwork + Dot Product)
+            
+            # 1. 上采样图像特征 -> [Total_People, 32, H*4, W*4]
+            upscaled_embedding = self.output_upscaling(src)
+            
+            # 2. 生成动态权重 -> [Total_People, 32]
+            # 【关键】直接使用 Backbone 中加载了预训练权重的 MLP
+            # SAM 的 output_hypernetworks_mlps 是一个 ModuleList，我们取第0个（对应Mask Token）
+            mlp_layer = self.backbone.fusion.output_hypernetworks_mlps[0]
+            hyper_weights = mlp_layer(heatmap_token_out)
+            
+            # 3. 点积 (Dynamic Convolution)
+            b, c, h, w = upscaled_embedding.shape
+            # (B, 1, C) @ (B, C, H*W) -> (B, 1, H*W)
+            heatmap = (hyper_weights.unsqueeze(1) @ upscaled_embedding.view(b, c, h * w))
+            heatmap = heatmap.view(b, 1, h, w) 
+            
+            # 4. 调整尺寸并激活
+            if heatmap.shape[-2:] != self.out_size:
+                heatmap = F.interpolate(heatmap, size=self.out_size, mode='bilinear', align_corners=False)
+            
+            heatmap = torch.sigmoid(heatmap).squeeze(1)
+            
+            # 将 Tensor 拆回 List [B_img1, B_img2...]
+            heatmap_preds = utils.split_tensors(heatmap, num_ppl_per_img)
 
-            # # 执行 Fusion (TwoWayTransformer)
-            # # 输出 dense_encoded: [Total_People, C, H, W] - 这是融合了 Head 位置信息的特征图
-            # _, head_map_embeddings = self.backbone.fusion(image_embeddings=x, sparse_embeddings=sparse_embeddings)
-            # x = x + (self.fusion_scale * head_map_embeddings)
+        # ==========================================
+        #            Standard 逻辑分支
+        # ==========================================
         else:
-            # === Standard 分支后续 ===
-            # print(num_ppl_per_img)
-            # 生成并叠加 Head Maps
+            # A. 叠加 Head Maps
             head_maps = torch.cat(self.get_input_head_maps(input["bboxes"]), dim=0).to(x.device) 
             head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
             x = x + head_map_embeddings
 
-            # Flatten for Transformer: "b c h w -> b (h w) c"
+            # B. Flatten 准备进入 Transformer
+            # "b c h w -> b (h w) c"
             x = x.flatten(start_dim=2).permute(0, 2, 1)
+            
             if self.inout:
-                x = torch.cat([self.inout_token.weight.unsqueeze(dim=0).repeat(x.shape[0], 1, 1), x], dim=1)
+                inout_t = self.inout_token.weight.unsqueeze(dim=0).repeat(x.shape[0], 1, 1)
+                x = torch.cat([inout_t, x], dim=1)
+            
+            # C. Transformer 交互
             x = self.transformer(x)
 
-        if self.inout:
-            inout_tokens = x[:, 0, :] 
-            inout_preds = self.inout_head(inout_tokens).squeeze(dim=-1)
-            inout_preds = utils.split_tensors(inout_preds, num_ppl_per_img)
-            x = x[:, 1:, :] 
+            # D. 解码 InOut
+            if self.inout:
+                inout_tokens = x[:, 0, :] 
+                inout_preds_flat = self.inout_head(inout_tokens).squeeze(dim=-1)
+                inout_preds = utils.split_tensors(inout_preds_flat, num_ppl_per_img)
+                x = x[:, 1:, :] 
+            
+            # E. 解码 Heatmap
+            # Reshape 回空间维度
+            x = x.permute(0, 2, 1).reshape(x.shape[0], self.dim, self.featmap_h, self.featmap_w)
+            
+            x = self.heatmap_head(x)
+            x = torchvision.transforms.functional.resize(x, self.out_size)
+            x = x.squeeze(1)
+            heatmap_preds = utils.split_tensors(x, num_ppl_per_img)
+
+        return {"heatmap": heatmap_preds, "inout": inout_preds}
         
-        x = x.reshape(x.shape[0], self.featmap_h, self.featmap_w, x.shape[2]).permute(0, 3, 1, 2)
-        x = self.heatmap_head(x).squeeze(dim=1)
-        x = torchvision.transforms.functional.resize(x, self.out_size)
-        heatmap_preds = utils.split_tensors(x, num_ppl_per_img)
-
-        return {"heatmap": heatmap_preds, "inout": inout_preds if self.inout else None}
-
     def get_input_head_maps(self, bboxes):
         # bboxes: [[(xmin, ymin, xmax, ymax)]] - list of list of head bboxes per image
         head_maps = []
