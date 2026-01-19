@@ -36,8 +36,8 @@ class GazeLLE(nn.Module):
         if self.is_sam:
             # ================= SAM 分支初始化 =================
             # Tokens: 如果有 inout，则需要 2 个 token [InOut, Heatmap]，否则 1 个 [Heatmap]
-            self.num_mask_tokens = 2 if self.inout else 1
-            self.mask_tokens = nn.Embedding(self.num_mask_tokens, self.dim)
+            self.num_output_tokens = 2 if self.inout else 1
+            self.output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
             
             # Upscaling Head: 
             # 负责将融合后的图像特征 (256维) 上采样并降维到 32维
@@ -101,8 +101,6 @@ class GazeLLE(nn.Module):
         
         # 1. 提取基础图像特征 [B, C, H, W]
         x = self.backbone.forward(input["images"]) 
-        x = self.linear(x) # [B, dim, H, W]
-        x = x + self.pos_embed
 
         # 将 Batch 维度展开为 Total_People 维度
         # x becomes: [Total_People, dim, H, W]
@@ -136,7 +134,7 @@ class GazeLLE(nn.Module):
             
             # C. 准备 Learnable Tokens
             # tokens: [Total_People, Num_Tokens, dim]
-            tokens = self.mask_tokens.weight.unsqueeze(0).repeat(x.shape[0], 1, 1)
+            tokens = self.output_tokens.weight.unsqueeze(0).repeat(x.shape[0], 1, 1)
             # 拼接: [Tokens, Sparse_Prompts]
             tokens = torch.cat((tokens, sparse_embeddings), dim=1)
 
@@ -189,6 +187,8 @@ class GazeLLE(nn.Module):
         #            Standard 逻辑分支
         # ==========================================
         else:
+            x = self.linear(x) # [B, dim, H, W]
+            x = x + self.pos_embed
             # A. 叠加 Head Maps
             head_maps = torch.cat(self.get_input_head_maps(input["bboxes"]), dim=0).to(x.device) 
             head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
@@ -222,7 +222,7 @@ class GazeLLE(nn.Module):
             heatmap_preds = utils.split_tensors(x, num_ppl_per_img)
 
         return {"heatmap": heatmap_preds, "inout": inout_preds}
-        
+
     def get_input_head_maps(self, bboxes):
         # bboxes: [[(xmin, ymin, xmax, ymax)]] - list of list of head bboxes per image
         head_maps = []
