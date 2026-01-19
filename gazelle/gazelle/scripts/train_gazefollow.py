@@ -150,28 +150,28 @@ def main():
     #     {"params": [p for n, p in model.named_parameters() if "fusion" not in n and p.requires_grad], "lr": args.lr},
     # ]
 
-    # 1. 区分参数组
-    finetune_params = []   # 存放 Fusion, LoRA, Prompt Encoder
-    scratch_params = []    # 存放 GazeLLE Head, Linear, Projector
+    # # 1. 区分参数组
+    # finetune_params = []   # 存放 Fusion, LoRA, Prompt Encoder
+    # scratch_params = []    # 存放 GazeLLE Head, Linear, Projector
 
-    for name, param in model.named_parameters():
-        if not param.requires_grad:
-            continue
+    # for name, param in model.named_parameters():
+    #     if not param.requires_grad:
+    #         continue
         
-        # 判定逻辑：如果是 backbone 里的 fusion 或 prompt_encoder 或 lora，归为微调组
-        if "backbone" in name and ("fusion" in name or "prompt" in name or "lora" in name):
-            finetune_params.append(param)
-            # print(f"Finetune (Low LR): {name}") # 调试用
-        else:
-            scratch_params.append(param)
-            # print(f"Scratch (High LR): {name}") # 调试用
+    #     # 判定逻辑：如果是 backbone 里的 fusion 或 prompt_encoder 或 lora，归为微调组
+    #     if "backbone" in name and ("fusion" in name or "prompt" in name or "lora" in name):
+    #         finetune_params.append(param)
+    #         # print(f"Finetune (Low LR): {name}") # 调试用
+    #     else:
+    #         scratch_params.append(param)
+    #         # print(f"Scratch (High LR): {name}") # 调试用
 
-    param_dicts = [
-        {'params': scratch_params, 'lr': args.lr},
-        {'params': finetune_params, 'lr': args.lr * 0.1}
-    ]
-    # optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    optimizer = torch.optim.AdamW(param_dicts, lr=args.lr, weight_decay=1e-4)
+    # param_dicts = [
+    #     {'params': scratch_params, 'lr': args.lr},
+    #     {'params': finetune_params, 'lr': args.lr * 0.1}
+    # ]
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    # optimizer = torch.optim.AdamW(param_dicts, lr=args.lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs, eta_min=1e-7)
 
     best_min_l2 = 1.0
