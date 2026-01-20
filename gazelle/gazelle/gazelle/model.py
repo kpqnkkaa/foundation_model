@@ -190,7 +190,7 @@ class GazeLLE(nn.Module):
             x = x + self.pos_embed
             
             x = utils.repeat_tensors(x, num_ppl_per_img)
-            
+
             # A. 叠加 Head Maps
             head_maps = torch.cat(self.get_input_head_maps(input["bboxes"]), dim=0).to(x.device) 
             head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
@@ -246,23 +246,16 @@ class GazeLLE(nn.Module):
             head_maps.append(torch.stack(img_head_maps))
         return head_maps
     
-    def get_gazelle_state_dict(self, include_backbone=False):
-        if include_backbone:
-            return self.state_dict()
-        else:
-            return {k: v for k, v in self.state_dict().items() if not k.startswith("backbone")}
-        
-    def load_gazelle_state_dict(self, ckpt_state_dict, include_backbone=False):
+    def get_gazelle_state_dict(self):
+        return self.state_dict()
+
+    def load_gazelle_state_dict(self, ckpt_state_dict):
         current_state_dict = self.state_dict()
         keys1 = current_state_dict.keys()
         keys2 = ckpt_state_dict.keys()
 
-        if not include_backbone:
-            keys1 = set([k for k in keys1 if not k.startswith("backbone")])
-            keys2 = set([k for k in keys2 if not k.startswith("backbone")])
-        else:
-            keys1 = set(keys1)
-            keys2 = set(keys2)
+        keys1 = set(keys1)
+        keys2 = set(keys2)
 
         if len(keys2 - keys1) > 0:
             print("WARNING unused keys in provided state dict: ", keys2 - keys1)
