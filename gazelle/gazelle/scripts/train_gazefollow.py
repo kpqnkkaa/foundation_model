@@ -10,7 +10,7 @@ import logging
 from tqdm import tqdm
 
 # 1. 强制设置可见显卡为 2, 3
-os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 from gazelle.dataloader import GazeDataset, collate_fn
 from gazelle.model import get_gazelle_model
@@ -20,8 +20,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, default="sam_vitb")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--ckpt_save_dir', type=str, default='./experiments')
-parser.add_argument('--wandb_project', type=str, default='gazelle')
-parser.add_argument('--exp_name', type=str, default='train_gazelle_dinov2_vitb_sam_prompt_gazefollow')
+parser.add_argument('--wandb_project', type=str, default='sam_prompt')
+parser.add_argument('--exp_name', type=str, default='train_sam_dinov2_vitb_lora_gazefollow')
 parser.add_argument('--log_iter', type=int, default=10, help='how often to log loss during training')
 parser.add_argument('--max_epochs', type=int, default=15)
 parser.add_argument('--batch_size', type=int, default=60)
