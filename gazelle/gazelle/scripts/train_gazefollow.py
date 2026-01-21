@@ -188,8 +188,6 @@ def main():
         epoch_losses = []
         
         for cur_iter, batch in pbar:
-            for cur_iter, batch in pbar:
-            # [修改] 增加新字段解包 (共12个变量)
             imgs, bboxes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = batch
 
             optimizer.zero_grad()

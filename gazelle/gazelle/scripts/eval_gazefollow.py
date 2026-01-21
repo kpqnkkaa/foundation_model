@@ -41,9 +41,8 @@ class GazeFollow(torch.utils.data.Dataset):
         return len(self.images)
     
 def collate(batch):
-    images, bboxes, gazex, gazey, height, width = zip(*batch)
-    return torch.stack(images), list(bboxes), list(gazex), list(gazey), list(height), list(width)
-
+    images, bboxes, gazex, gazey, height, width, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = zip(*batch)
+    return torch.stack(images), list(bboxes), list(gazex), list(gazey), list(height), list(width), list(observer_expressions), list(gaze_directions), list(gaze_point_expressions), list(seg_mask_paths)
 
 @torch.no_grad()
 def main():
@@ -63,7 +62,7 @@ def main():
     min_l2s = []
     avg_l2s = []
 
-    for _, (images, bboxes, gazex, gazey, height, width) in tqdm(enumerate(dataloader), desc="Evaluating", total=len(dataloader)):
+    for _, (images, bboxes, gazex, gazey, height, width, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths) in tqdm(enumerate(dataloader), desc="Evaluating", total=len(dataloader)):
         preds = model.forward({"images": images.to(device), "bboxes": bboxes})
         
         # eval each instance (head)

@@ -301,9 +301,11 @@ def get_gazelle_model(model_name):
         "gazelle_dinov2_vitl14": gazelle_dinov2_vitl14,
         "gazelle_dinov2_vitb14_inout": gazelle_dinov2_vitb14_inout,
         "gazelle_dinov2_vitl14_inout": gazelle_dinov2_vitl14_inout,
-        # 新增 SAM 模型
-        "sam_vitb": sam_vitb,
-        "sam_vitb_inout": sam_vitb_inout,
+        # 新增sam模型
+        "gazelle_sam_vitb": gazelle_sam_vitb,
+        "sam_dinov2_vitb": sam_dinov2_vitb14,
+        "sam_sam_vitb": sam_sam_vitb,
+        "sam_sam_vitb_multi_input": sam_sam_vitb_multi_input,
     }
     assert model_name in factory.keys(), "invalid model name"
     return factory[model_name]()
