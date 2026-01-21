@@ -51,6 +51,7 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
         img_data = self.data[img_idx]
         head_data = copy.deepcopy(img_data['heads'][head_idx])
         bbox_norm = head_data['bbox_norm']
+        eye_norm = head_data['eye_norm']
         gazex_norm = head_data['gazex_norm']
         gazey_norm = head_data['gazey_norm']
         inout = head_data['inout']
@@ -110,9 +111,9 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
         
         if self.split == "train":
             heatmap = utils.get_heatmap(gazex_norm[0], gazey_norm[0], 64, 64) # note for training set, there is only one annotation
-            return img, bbox_norm, gazex_norm, gazey_norm, torch.tensor(inout), height, width, heatmap, observer_expression_ids, torch.tensor(gaze_direction), gaze_point_expression_ids, seg_mask_path
+            return img, bbox_norm, eye_norm, gazex_norm, gazey_norm, torch.tensor(inout), height, width, heatmap, observer_expression_ids, torch.tensor(gaze_direction), gaze_point_expression_ids, seg_mask_path
         else:
-            return img, bbox_norm, gazex_norm, gazey_norm, torch.tensor(inout), height, width, observer_expression_ids, torch.tensor(gaze_direction), gaze_point_expression_ids, seg_mask_path
+            return img, bbox_norm, eye_norm, gazex_norm, gazey_norm, torch.tensor(inout), height, width, observer_expression_ids, torch.tensor(gaze_direction), gaze_point_expression_ids, seg_mask_path
 
     def __len__(self):
         return len(self.data_idxs)

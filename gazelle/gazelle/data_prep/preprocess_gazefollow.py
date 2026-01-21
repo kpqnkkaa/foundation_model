@@ -144,11 +144,13 @@ def main(DATA_PATH):
     TEST_FRAME_DICT = {}
     df = df.groupby(["path", "eye_x"]).agg(list) # aggregate over frames
     for id, row in df.iterrows(): # aggregate by frame
-        path, _ = id
+        path, eye_x_val = id
+        item_data = row.to_dict()
+        item_data['eye_x'] = [eye_x_val]
         if path in TEST_FRAME_DICT.keys():
-            TEST_FRAME_DICT[path].append(row)
+            TEST_FRAME_DICT[path].append(item_data)
         else:
-            TEST_FRAME_DICT[path] = [row]
+            TEST_FRAME_DICT[path] = [item_data]
 
     multiperson_ex = 0
     TEST_FRAMES = []
@@ -213,12 +215,10 @@ def main(DATA_PATH):
             gazex = [x * float(width) for x in row['gaze_x']]
             gazey = [y * float(height) for y in row['gaze_y']]
 
-            print(row['eye_x'][0], row['eye_y'][0])
-
             heads.append({
                 'bbox': [xmin, ymin, xmax, ymax],
                 'bbox_norm': [xmin / float(width), ymin / float(height), xmax / float(width), ymax / float(height)],
-                'eye': [row['eye_x'][0], row['eye_y'][0]],
+                'eye_norm': [row['eye_x'][0], row['eye_y'][0]],
                 'gazex': gazex,
                 'gazey': gazey,
                 'gazex_norm': gazex_norm,

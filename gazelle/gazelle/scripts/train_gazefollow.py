@@ -188,11 +188,11 @@ def main():
         epoch_losses = []
         
         for cur_iter, batch in pbar:
-            imgs, bboxes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = batch
+            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = batch
 
             optimizer.zero_grad()
             
-            preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes]})
+            preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes.cuda(), "expr_ids": observer_expressions.cuda()})
             
             if isinstance(preds['heatmap'], list):
                  heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
@@ -235,10 +235,10 @@ def main():
                          desc=f"Epoch {epoch} [Eval]", unit="batch", dynamic_ncols=True)
         
         for cur_iter, batch in eval_pbar:
-            imgs, bboxes, gazex, gazey, inout, heights, widths, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = batch
+            imgs, bboxes, eyes,gazex, gazey, inout, heights, widths, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = batch
 
             with torch.no_grad():
-                preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes]})
+                preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes.cuda(), "expr_ids": observer_expressions.cuda()})
 
             if isinstance(preds['heatmap'], list):
                  heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
