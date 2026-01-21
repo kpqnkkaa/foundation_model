@@ -1,0 +1,4 @@
+2026-01-21 17:25:15,705 - Experiment Config: {'model': 'sam_vitb', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'ckpt_save_dir': './experiments', 'wandb_project': 'sam_prompt', 'exp_name': 'train_sam_dinov2_lora_prompt_gazefollow_multi_input', 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
+2026-01-21 17:25:36,817 - Learnable parameters: 6972160
+2026-01-21 17:25:39,105 - 
+[Epoch 0 Training]

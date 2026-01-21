@@ -21,7 +21,7 @@ parser.add_argument('--model', type=str, default="sam_vitb")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--ckpt_save_dir', type=str, default='./experiments')
 parser.add_argument('--wandb_project', type=str, default='sam_prompt')
-parser.add_argument('--exp_name', type=str, default='train_sam_vitb_lora_prompt_gazefollow')
+parser.add_argument('--exp_name', type=str, default='train_sam_dinov2_lora_prompt_gazefollow_multi_input')
 parser.add_argument('--log_iter', type=int, default=10, help='how often to log loss during training')
 parser.add_argument('--max_epochs', type=int, default=15)
 parser.add_argument('--batch_size', type=int, default=60)
@@ -188,7 +188,9 @@ def main():
         epoch_losses = []
         
         for cur_iter, batch in pbar:
-            imgs, bboxes, gazex, gazey, inout, heights, widths, heatmaps = batch
+            for cur_iter, batch in pbar:
+            # [修改] 增加新字段解包 (共12个变量)
+            imgs, bboxes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = batch
 
             optimizer.zero_grad()
             
@@ -235,7 +237,7 @@ def main():
                          desc=f"Epoch {epoch} [Eval]", unit="batch", dynamic_ncols=True)
         
         for cur_iter, batch in eval_pbar:
-            imgs, bboxes, gazex, gazey, inout, heights, widths = batch
+            imgs, bboxes, gazex, gazey, inout, heights, widths, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = batch
 
             with torch.no_grad():
                 preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes]})
