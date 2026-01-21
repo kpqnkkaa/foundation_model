@@ -226,17 +226,11 @@ def main():
             else:
                  heatmap_preds = preds['heatmap'].squeeze(dim=1)
 
-            if isinstance(preds['text_loss_scalar'], list):
-                text_loss_scalars = torch.stack(preds['text_loss_scalar']).squeeze(dim=1)
-            else:
-                text_loss_scalars = preds['text_loss_scalar'].squeeze(dim=1)
-
-
             heatmap_loss = criterion_bce(heatmap_preds, heatmaps.cuda())
             loss = heatmap_loss
 
-            if preds['text_preds'] is not None:
-                text_loss = preds['text_preds']
+            if preds['text_loss'] is not None:
+                text_loss = preds['text_loss']
                 loss += text_loss
             
             if preds['seg'] is not None:
@@ -252,12 +246,18 @@ def main():
             
             epoch_losses.append(heatmap_loss.item())
 
-            pbar.set_postfix({'heatmap_loss': f"{heatmap_loss.item():.4f}", 'text_loss': f"{text_loss.item():.4f}", 'seg_loss': f"{seg_loss.item():.4f}", 'direction_loss': f"{direction_loss.item():.4f}", 'loss': f"{loss.item():.4f}"})
+            if text_loss is not None:
+                pbar.set_postfix({'heatmap_loss': f"{heatmap_loss.item():.4f}", 'text_loss': f"{text_loss.item():.4f}", 'seg_loss': f"{seg_loss.item():.4f}", 'direction_loss': f"{direction_loss.item():.4f}", 'loss': f"{loss.item():.4f}"})
+            else:
+                pbar.set_postfix({'loss': f"{heatmap_loss.item():.4f}"})
 
             if cur_iter % args.log_iter == 0:
-                wandb.log({"train/heatmap_loss": heatmap_loss.item(), "train/text_loss": text_loss.item(), "train/seg_loss": seg_loss.item(), "train/direction_loss": direction_loss.item(), "train/loss": loss.item()})
-                logger.info(f"Iter {cur_iter}/{len(train_dl)}, Heatmap Loss={heatmap_loss.item():.4f}, Text Loss={text_loss.item():.4f}, Seg Loss={seg_loss.item():.4f}, Direction Loss={direction_loss.item():.4f}, Loss={loss.item():.4f}")
-
+                if text_loss is not None:
+                    wandb.log({"train/heatmap_loss": heatmap_lossl.item(), "train/text_loss": text_loss.item(), "train/seg_loss": seg_loss.item(), "train/direction_loss": direction_loss.item(), "train/loss": loss.item()})
+                    logger.info(f"Iter {cur_iter}/{len(train_dl)}, Loss={heatmap_loss.item():.4f}, Text Loss={text_loss.item():.4f}, Seg Loss={seg_loss.item():.4f}, Direction Loss={direction_loss.item():.4f}, Loss={loss.item():.4f}")
+                else:
+                    wandb.log({"train/heatmap_loss": heatmap_loss.item(), "train/loss": loss.item()})
+                    logger.info(f"Iter {cur_iter}/{len(train_dl)}, Loss={heatmap_loss.item():.4f}, Loss={loss.item():.4f}")
         scheduler.step()
         avg_train_loss = np.mean(epoch_losses)
         logger.info(f"End of Epoch {epoch} Train - Avg Loss: {avg_train_loss:.4f}")
@@ -285,7 +285,7 @@ def main():
             imgs, bboxes, eyes,gazex, gazey, inout, heights, widths, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = batch
 
             with torch.no_grad():
-                preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "expr_ids": observer_expressions})
+                preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions})
 
             if isinstance(preds['heatmap'], list):
                  heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)

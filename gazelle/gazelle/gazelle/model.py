@@ -274,7 +274,7 @@ class GazeLLE(nn.Module):
                 "inout": inout_preds,
                 "seg": seg_preds,
                 "direction": direction_preds,
-                "text_preds": text_preds}
+                "text_loss": text_preds}
 
     def get_input_head_maps(self, bboxes):
         # bboxes: [[(xmin, ymin, xmax, ymax)]] - list of list of head bboxes per image
