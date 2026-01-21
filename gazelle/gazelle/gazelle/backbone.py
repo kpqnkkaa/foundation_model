@@ -73,8 +73,9 @@ class DinoV2Backbone(Backbone):
         ])
 
 class SAMImageEncoder(nn.Module):
-    def __init__(self, checkpoint_path, model_type="vit_b", is_lora=False, lora_r=8, img_size=448):
+    def __init__(self,  model_type="vit_b", is_lora=False, lora_r=8, img_size=448):
         super().__init__()
+        checkpoint_path = get_sam_checkpoint_path(model_type)
         if sam_model_registry is None: raise ImportError("No segment_anything found.")
         if LoraConfig is None: raise ImportError("No peft found. pip install peft")
 
@@ -137,8 +138,9 @@ class SAMImageEncoder(nn.Module):
 
 
 class SAMPromptEncoder(nn.Module):
-    def __init__(self, checkpoint_path, model_type="vit_b", is_multi_input=False, is_lora=False, lora_r=8):
+    def __init__(self, model_type="vit_b", is_multi_input=False, is_lora=False, lora_r=8):
         super().__init__()
+        checkpoint_path = get_sam_checkpoint_path(model_type)
         sam_model = sam_model_registry[model_type](checkpoint=checkpoint_path)
         self.prompt_encoder = sam_model.prompt_encoder
         self.is_multi_input = is_multi_input
@@ -165,12 +167,12 @@ class SAMPromptEncoder(nn.Module):
         bboxes: Tensor [B, 4] 绝对坐标
         """
         if self.is_multi_input:
-            assert eyes is not None and expr_ids is not None, "eyes and expr_ids are required for multi-input"
+            assert expr_ids is not None, "expr_ids are required for multi-input"
         bs = bboxes.shape[0]
         b_coords = bboxes.reshape(bs, 2, 2)
         # 2: top-left, 3: bottom-right
         b_label = torch.tensor([2, 3], device=device).unsqueeze(0).repeat(bs, 1)
-        if self.is_multi_input:
+        if self.is_multi_input and eyes is not None:
             e_coords = eyes.unsqueeze(1) 
             e_label = torch.ones(bs, 1, device=device) 
             coords = torch.cat([e_coords, b_coords], dim=1)
@@ -198,8 +200,9 @@ class SAMFusion(nn.Module):
     """
     SAM TwoWayTransformer: 负责 Image 和 Prompt 的交互
     """
-    def __init__(self, checkpoint_path, model_type="vit_b"):
+    def __init__(self, model_type="vit_b"):
         super().__init__()
+        checkpoint_path = get_sam_checkpoint_path(model_type)
         from segment_anything import sam_model_registry # 确保这里能引用到
         sam_model = sam_model_registry[model_type](checkpoint=checkpoint_path)
         self.transformer = sam_model.mask_decoder.transformer
@@ -242,10 +245,9 @@ class SAMFusion(nn.Module):
 
 # --- Wrapper Class for Model Compatibility ---
 class SAMBackboneWrapper(Backbone):
-    def __init__(self, checkpoint_path, model_type="vit_b", lora_r=8, in_size=(448, 448), backbone_type="dinov2", is_lora=False, is_multi_input=False):
+    def __init__(self, model_type="vit_b", lora_r=8, in_size=(448, 448), backbone_type="dinov2", is_lora=False, is_multi_input=False):
         super().__init__()
         self.model_type = model_type
-        self.checkpoint_path = checkpoint_path
         self.in_size = in_size
         
         # 实例化三个组件
@@ -255,10 +257,10 @@ class SAMBackboneWrapper(Backbone):
             elif model_type == "vit_l":
                 self.img_encoder = DinoV2Backbone('dinov2_vitl14', is_lora, lora_r)
         elif backbone_type == "sam":
-            self.img_encoder = SAMImageEncoder(checkpoint_path, model_type, is_lora, lora_r, in_size[0])
+            self.img_encoder = SAMImageEncoder(model_type, is_lora, lora_r, in_size[0])
 
-        self.prompt_encoder = SAMPromptEncoder(checkpoint_path, model_type, is_multi_input, is_lora, lora_r)
-        self.fusion = SAMFusion(checkpoint_path, model_type)
+        self.prompt_encoder = SAMPromptEncoder(model_type, is_multi_input, is_lora, lora_r)
+        self.fusion = SAMFusion(model_type)
         
     def forward(self, x):
         # 仅用于兼容 Backbone 接口，实际逻辑在 model.py 中显式调用各个组件
@@ -277,3 +279,28 @@ class SAMBackboneWrapper(Backbone):
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             transforms.Resize(in_size),
         ])
+
+def get_sam_checkpoint_path(model_type):
+    """
+    检查 PyTorch 缓存中是否有权重，如果没有则自动下载。
+    模仿 torch.hub 的行为。
+    """
+    if model_type not in SAM_URLS:
+        raise ValueError(f"Invalid SAM model type: {model_type}. Options: {list(SAM_URLS.keys())}")
+
+    url = SAM_URLS[model_type]
+    # 获取 PyTorch Hub 的标准缓存目录 (通常是 ~/.cache/torch/hub/checkpoints)
+    model_dir = os.path.join(torch.hub.get_dir(), "checkpoints")
+    os.makedirs(model_dir, exist_ok=True)
+
+    filename = os.path.basename(url)
+    filepath = os.path.join(model_dir, filename)
+
+    if not os.path.exists(filepath):
+        print(f"Downloading SAM {model_type} checkpoint to {filepath} ...")
+        # 使用 torch 提供的工具下载，支持进度条
+        torch.hub.download_url_to_file(url, filepath)
+    else:
+        print(f"Found existing SAM checkpoint at {filepath}")
+
+    return filepath

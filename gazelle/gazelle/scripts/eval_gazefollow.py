@@ -62,8 +62,8 @@ def main():
     min_l2s = []
     avg_l2s = []
 
-    for _, (images, bboxes, gazex, gazey, height, width, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths) in tqdm(enumerate(dataloader), desc="Evaluating", total=len(dataloader)):
-        preds = model.forward({"images": images.to(device), "bboxes": bboxes})
+    for _, (images, bboxes, eyes, gazex, gazey, height, width, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths) in tqdm(enumerate(dataloader), desc="Evaluating", total=len(dataloader)):
+        preds = model.forward({"images": images.to(device), "bboxes": bboxes, "eyes": eyes.to(device), "expr_ids": observer_expressions.to(device)})
         
         # eval each instance (head)
         for i in range(images.shape[0]): # per image

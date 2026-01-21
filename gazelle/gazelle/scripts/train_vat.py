@@ -181,13 +181,13 @@ def main():
         epoch_losses = []
 
         for cur_iter, batch in pbar:
-            imgs, bboxes, gazex, gazey, inout, heights, widths, heatmaps = batch
+            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps = batch
 
             optimizer.zero_grad()
             
             # 使用包装器处理输入
             # wrapper 会负责分发到 gpu1 并移回结果
-            preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes]})
+            preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": None, "expr_ids": observer_expressions.cuda()})
             
             # 处理多卡返回结果
             # 经过 Custom Gather 后，preds['heatmap'] 是一个长度为 Batch Size 的扁平 List
@@ -249,10 +249,10 @@ def main():
                          desc=f"Epoch {epoch} [Eval]", unit="batch", dynamic_ncols=True)
 
         for cur_iter, batch in eval_pbar:
-            imgs, bboxes, gazex, gazey, inout, heights, widths = batch
+            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths = batch
 
             with torch.no_grad():
-                preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes]})
+                preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": None, "expr_ids": observer_expressions.cuda()})
 
             if isinstance(preds['heatmap'], list):
                 heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)

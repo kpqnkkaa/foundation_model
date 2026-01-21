@@ -114,6 +114,7 @@ class GazeLLE(nn.Module):
             x = utils.repeat_tensors(x, num_ppl_per_img)
             # A. 准备 Prompts (将归一化 bbox 转为绝对坐标)
             flat_bboxes = []
+            flat_eyes = []
             for bbox_list in input["bboxes"]:
                 for bbox in bbox_list:
                     xmin, ymin, xmax, ymax = bbox
@@ -123,13 +124,17 @@ class GazeLLE(nn.Module):
                         xmax * self.in_size[1], 
                         ymax * self.in_size[0]
                     ])
-            
+                    flat_eyes.append([
+                        eye_x * self.in_size[1],
+                        eye_y * self.in_size[0]
+                    ])
             # [Total_People, 4]
             bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
+            eyes_tensor = torch.tensor(flat_eyes, device=x.device, dtype=torch.float32)
             
             # B. 获取 Sparse Embeddings (通过 Backbone 的 Prompt Encoder)
             # [Total_People, N_sparse, dim]
-            sparse_embeddings = self.backbone.prompt_encoder(bboxes_tensor, device=x.device)
+            sparse_embeddings = self.backbone.prompt_encoder(bboxes_tensor, device=x.device, eyes=eyes_tensor, expr_ids=input["expr_ids"])
             
             # C. 准备 Learnable Tokens
             # tokens: [Total_People, Num_Tokens, dim]
@@ -336,7 +341,7 @@ def gazelle_dinov2_vitl14_inout():
     return model, transform
 
 def gazelle_sam_vitb():
-    backbone = SAMImageEncoder(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448))
+    backbone = SAMImageEncoder(model_type="vit_b", in_size=(448, 448))
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
     return model, transform
@@ -345,25 +350,25 @@ def sam_dinov2_vitb():
     # 自动获取路径，不存在则下载
     checkpoint = get_sam_checkpoint_path("vit_b")
     
-    backbone = SAMBackboneWrapper(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=False, is_multi_input=False)
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=False, is_multi_input=False)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
     return model, transform
 
 def sam_dinov2_vitb_lora():
-    backbone = SAMBackboneWrapper(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=False)
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=False)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
     return model, transform
 
 def sam_sam_vitb_lora():
-    backbone = SAMBackboneWrapper(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=True, is_multi_input=False)
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=True, is_multi_input=False)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
     return model, transform
 
 def sam_sam_vitb_lora_multi_input():
-    backbone = SAMBackboneWrapper(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=True, is_multi_input=True)
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=True, is_multi_input=True)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
     return model, transform
@@ -375,28 +380,3 @@ SAM_URLS = {
     "vit_l": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_l_0b3195.pth",
     "vit_h": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth",
 }
-
-def get_sam_checkpoint_path(model_type):
-    """
-    检查 PyTorch 缓存中是否有权重，如果没有则自动下载。
-    模仿 torch.hub 的行为。
-    """
-    if model_type not in SAM_URLS:
-        raise ValueError(f"Invalid SAM model type: {model_type}. Options: {list(SAM_URLS.keys())}")
-
-    url = SAM_URLS[model_type]
-    # 获取 PyTorch Hub 的标准缓存目录 (通常是 ~/.cache/torch/hub/checkpoints)
-    model_dir = os.path.join(torch.hub.get_dir(), "checkpoints")
-    os.makedirs(model_dir, exist_ok=True)
-
-    filename = os.path.basename(url)
-    filepath = os.path.join(model_dir, filename)
-
-    if not os.path.exists(filepath):
-        print(f"Downloading SAM {model_type} checkpoint to {filepath} ...")
-        # 使用 torch 提供的工具下载，支持进度条
-        torch.hub.download_url_to_file(url, filepath)
-    else:
-        print(f"Found existing SAM checkpoint at {filepath}")
-
-    return filepath

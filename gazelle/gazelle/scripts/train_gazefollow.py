@@ -17,10 +17,10 @@ from gazelle.model import get_gazelle_model
 from gazelle.utils import gazefollow_auc, gazefollow_l2
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default="sam_vitb")
+parser.add_argument('--model', type=str, default="sam_sam_vitb_lora_multi_input")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--ckpt_save_dir', type=str, default='./experiments')
-parser.add_argument('--wandb_project', type=str, default='sam_prompt')
+parser.add_argument('--wandb_project', type=str, default='sam_sam_vitb_lora_multi_input')
 parser.add_argument('--exp_name', type=str, default='train_sam_dinov2_lora_prompt_gazefollow_multi_input')
 parser.add_argument('--log_iter', type=int, default=10, help='how often to log loss during training')
 parser.add_argument('--max_epochs', type=int, default=15)
