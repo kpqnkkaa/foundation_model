@@ -311,7 +311,7 @@ def get_gazelle_model(model_name):
         "sam_dinov2_vitb": sam_dinov2_vitb,
         "sam_dinov2_vitb_lora": sam_dinov2_vitb_lora,
         "sam_sam_vitb_lora": sam_sam_vitb_lora,
-        "sam_sam_vitb_lora_multi_input": sam_sam_vitb_lora_multi_input,
+        "sam_dinov2_vitb_lora_multi_input": sam_dinov2_vitb_lora_multi_input,
     }
     assert model_name in factory.keys(), "invalid model name"
     return factory[model_name]()
@@ -367,16 +367,8 @@ def sam_sam_vitb_lora():
     model = GazeLLE(backbone, inout=False)
     return model, transform
 
-def sam_sam_vitb_lora_multi_input():
-    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=True, is_multi_input=True)
+def sam_dinov2_vitb_lora_multi_input():
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=True)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
     return model, transform
-   
-# === 新增：SAM 权重自动下载逻辑 ===
-
-SAM_URLS = {
-    "vit_b": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth",
-    "vit_l": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_l_0b3195.pth",
-    "vit_h": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth",
-}
