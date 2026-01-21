@@ -161,11 +161,10 @@ class SAMPromptEncoder(nn.Module):
             if is_lora:
                 peft_config = LoraConfig(
                     task_type=TaskType.FEATURE_EXTRACTION, 
-                    r=lora_r, lora_alpha=lora_r, 
+                    r=lora_r, lora_alpha=lora_r * 2, 
                     target_modules=["c_attn"], lora_dropout=0.1, bias="none"
                 )
                 self.text_encoder = get_peft_model(self.text_encoder, peft_config)
-                print("Text Encoder Trainable Parameters:")
                 self.text_encoder.print_trainable_parameters()
             self.text_proj = nn.Linear(768, 256) 
 
