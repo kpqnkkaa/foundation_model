@@ -9,6 +9,7 @@ from PIL import Image
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_path", type=str, default="/mnt/nvme1n1/lululemon/xjj/datasets/resized/videoattentiontarget")
+parser.add_argument("--fusion_path", type=str, default="/mnt/nvme1n1/lululemon/xjj/result/information_fusion")
 args = parser.parse_args()
 
 # preprocessing adapted from https://github.com/ejcgt/attention-target-detection/blob/master/dataset.py
@@ -40,8 +41,37 @@ def smooth_df(window_size, df):
     df["ymax"] = smooth_by_conv(window_size, df, "ymax")
     return df
 
+def load_fusion_data(fusion_path, json_filename):
+    full_path = os.path.join(fusion_path, json_filename)
+    print(f"Loading fusion data from {full_path}...")
+    with open(full_path, 'r') as f:
+        data = json.load(f)
+    
+    # 构建字典：key=image_path (全局唯一路径), value=list of persons
+    fusion_dict = {}
+    for item in data:
+        # 尝试获取 path 字段 (例如 "images/video1/clip1/00001.jpg")
+        # 如果没有 path 字段，则回退到 index (但在VAT中这可能不安全)
+        key = item.get('path') 
+        if key is None and 'index' in item:
+             # 仅作备选，VAT中建议必须有 path
+             key = item['index'].split('_person')[0]
+
+        if key:
+            if key not in fusion_dict:
+                fusion_dict[key] = []
+            fusion_dict[key].append(item)
+    return fusion_dict
+
+def is_bbox_match(bbox1, bbox2, threshold=0.01):
+    # 比较两个归一化 bbox 是否接近
+    return all(abs(b1 - b2) < threshold for b1, b2 in zip(bbox1, bbox2))
 
 def main(PATH):
+    print("Loading Fusion JSONs...")
+    fusion_train = load_fusion_data(args.fusion_path, "merged_VAT_train_EN_Qwen_Qwen3-VL-32B-Instruct_with_SEG.json")
+    fusion_test = load_fusion_data(args.fusion_path, "merged_VAT_test_EN_Qwen_Qwen3-VL-32B-Instruct_with_SEG.json")
+
     # preprocess by sequence and person track
     splits = ["train", "test"]
 
@@ -97,6 +127,43 @@ def main(PATH):
                         xmax = min(xmax, width)
                         ymax = min(ymax, height)
 
+                        current_fusion_dict = fusion_train if split == "train" else fusion_test
+                        
+                        current_frame_path = os.path.join(seq_img_path, row["path"])
+                        
+                        # 3. 计算当前 bbox_norm 用于匹配
+                        current_bbox_norm = [xmin / float(width), ymin / float(height), xmax / float(width), ymax / float(height)]
+
+                        # 4. 初始化默认值
+                        observer_expression_unique = []
+                        gaze_direction = ""
+                        gaze_point_expressions = []
+                        seg_mask_path = ""
+
+                        # 5. 查找匹配
+                        if current_frame_path in current_fusion_dict:
+                            candidates = current_fusion_dict[current_frame_path]
+                            for cand in candidates:
+                                if 'head_bbox_norm' not in cand:
+                                    continue
+                                
+                                # 处理 BBox 格式 (Dict 转 List)
+                                cand_bbox = cand['head_bbox_norm']
+                                if isinstance(cand_bbox, dict):
+                                    cand_bbox = [cand_bbox['x_min'], cand_bbox['y_min'], cand_bbox['x_max'], cand_bbox['y_max']]
+
+                                if is_bbox_match(cand_bbox, current_bbox_norm):
+                                    # 提取数据 (包含 NoneType 检查)
+                                    if cand.get('observer_expression') is not None and 'unique' in cand['observer_expression']:
+                                        observer_expression_unique = cand['observer_expression']['unique']
+                                    
+                                    if cand.get('gazes') is not None and len(cand['gazes']) > 0:
+                                        gaze_info = cand['gazes'][0]
+                                        gaze_direction = gaze_info.get('gaze_direction', "")
+                                        gaze_point_expressions = gaze_info.get('gaze_point_expressions', [])
+                                        seg_mask_path = gaze_info.get('seg_mask_path', "")
+                                    break
+
                         frame_dict["heads"].append({
                             "bbox": [xmin, ymin, xmax, ymax],
                             "bbox_norm": [xmin / float(width), ymin / float(height), xmax / float(width), ymax / float(height)],
@@ -104,7 +171,11 @@ def main(PATH):
                             "gazex_norm": [gazex / float(width)],
                             "gazey": [gazey],
                             "gazey_norm": [gazey / float(height)],
-                            "inout": inout
+                            "inout": inout,
+                            'observer_expression': observer_expression_unique,
+                            'gaze_direction': gaze_direction,
+                            'gaze_point_expressions': gaze_point_expressions,
+                            'seg_mask_path': seg_mask_path
                         })
                     p_idx = p_idx + 1
 
