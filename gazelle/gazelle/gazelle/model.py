@@ -66,6 +66,28 @@ class GazeLLE(nn.Module):
                     nn.Linear(128, 1),
                     nn.Sigmoid()
                 )
+            if self.is_multi_output:
+                self.direction_head = nn.Sequential(
+                    nn.Linear(self.dim, 128),
+                    nn.ReLU(),
+                    nn.Dropout(0.1),
+                    nn.Linear(128, 1),
+                    nn.Sigmoid()
+                )
+                self.expression_head = nn.Sequential(
+                    nn.Linear(self.dim, 128),
+                    nn.ReLU(),
+                    nn.Dropout(0.1),
+                    nn.Linear(128, 1),
+                    nn.Sigmoid()
+                )
+                self.seg_head = nn.Sequential(
+                    nn.Linear(self.dim, 128),
+                    nn.ReLU(),
+                    nn.Dropout(0.1),
+                    nn.Linear(128, 1),
+                    nn.Sigmoid()
+                )
 
         else:
             # ================= Standard 分支初始化 =================
@@ -162,13 +184,28 @@ class GazeLLE(nn.Module):
                 # 约定: token 0 是 InOut, token 1 是 Heatmap
                 inout_token_out = hs[:, 0, :] 
                 heatmap_token_out = hs[:, 1, :]
-                
                 # 预测 InOut
                 inout_preds_flat = self.inout_head(inout_token_out).squeeze(dim=-1)
                 inout_preds = utils.split_tensors(inout_preds_flat, num_ppl_per_img)
+                if self.is_multi_output:
+                    seg_token_out = hs[:, 2, :]
+                    direction_token_out = hs[:, 3, :]
+                    expression_token_out = hs[:, 4, :]
+                    direction_preds_flat = self.direction_head(direction_token_out).squeeze(dim=-1)
+                    expression_preds_flat = self.expression_head(expression_token_out).squeeze(dim=-1)
+                    direction_preds = utils.split_tensors(direction_preds_flat, num_ppl_per_img)
+                    expression_preds = utils.split_tensors(expression_preds_flat, num_ppl_per_img)
             else:
                 # 只有 Heatmap Token
                 heatmap_token_out = hs[:, 0, :]
+                if self.is_multi_output:
+                    seg_token_out = hs[:, 1, :]
+                    direction_token_out = hs[:, 2, :]
+                    expression_token_out = hs[:, 3, :]
+                    direction_preds_flat = self.direction_head(direction_token_out).squeeze(dim=-1)
+                    expression_preds_flat = self.expression_head(expression_token_out).squeeze(dim=-1)
+                    direction_preds = utils.split_tensors(direction_preds_flat, num_ppl_per_img)
+                    expression_preds = utils.split_tensors(expression_preds_flat, num_ppl_per_img)
 
             # F. 生成 Heatmap (Hypernetwork + Dot Product)
             
@@ -195,6 +232,16 @@ class GazeLLE(nn.Module):
             
             # 将 Tensor 拆回 List [B_img1, B_img2...]
             heatmap_preds = utils.split_tensors(heatmap, num_ppl_per_img)
+
+            # seg
+            if self.is_multi_output:
+                seg_hyper_weights = mlp_layer(seg_token_out)
+                seg = (seg_hyper_weights.unsqueeze(1) @ upscaled_embedding.view(b, c, h * w))
+                seg = seg.view(b, 1, h, w) 
+                if seg.shape[-2:] != self.out_size:
+                    seg = F.interpolate(seg, size=self.out_size, mode='bilinear', align_corners=False)
+                seg = torch.sigmoid(seg).squeeze(1)
+                seg_preds = utils.split_tensors(seg, num_ppl_per_img)
 
         # ==========================================
         #            Standard 逻辑分支
