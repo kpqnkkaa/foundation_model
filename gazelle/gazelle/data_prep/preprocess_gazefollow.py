@@ -28,7 +28,6 @@ def load_fusion_data(fusion_path, json_filename):
     return fusion_dict
 
 def is_bbox_match(bbox1, bbox2, threshold=0.01):
-    # 比较两个归一化 bbox 是否接近
     return all(abs(b1 - b2) < threshold for b1, b2 in zip(bbox1, bbox2))
 
 def main(DATA_PATH):
@@ -89,8 +88,13 @@ def main(DATA_PATH):
             if image_id_str in fusion_dict_train:
                 candidates = fusion_dict_train[image_id_str]
                 for cand in candidates:
-                    # 对比 bbox (容差 0.01)
-                    if 'head_bbox_norm' in cand and is_bbox_match(cand['head_bbox_norm'], current_bbox_norm):
+                    # [新增] 处理字典格式，转为列表 [xmin, ymin, xmax, ymax]
+                    cand_bbox = cand['head_bbox_norm']
+                    if isinstance(cand_bbox, dict):
+                        cand_bbox = [cand_bbox['x_min'], cand_bbox['y_min'], cand_bbox['x_max'], cand_bbox['y_max']]
+                    
+                    # 使用转换后的 cand_bbox 进行比较
+                    if is_bbox_match(cand_bbox, current_bbox_norm):
                         # 提取数据
                         if 'observer_expression' in cand and 'unique' in cand['observer_expression']:
                             observer_expression_unique = cand['observer_expression']['unique']
@@ -129,6 +133,9 @@ def main(DATA_PATH):
     json.dump(TRAIN_FRAMES, out_file)
 
     # TEST
+    test_fusion_file = "merged_GazeFollow_test_EN_Qwen_Qwen3-VL-32B-Instruct_with_SEG.json"
+    fusion_dict_test = load_fusion_data(args.fusion_path, test_fusion_file)
+
     test_csv_path = os.path.join(DATA_PATH, "test_annotations_release.txt")
     column_names = ['path', 'idx', 'body_bbox_x', 'body_bbox_y', 'body_bbox_w', 'body_bbox_h', 'eye_x', 'eye_y',
                                 'gaze_x', 'gaze_y', 'bbox_x_min', 'bbox_y_min', 'bbox_x_max', 'bbox_y_max', 'source', 'meta']
@@ -174,6 +181,33 @@ def main(DATA_PATH):
             xmax = min(xmax, width)
             ymax = min(ymax, height)
 
+            current_bbox_norm = [xmin / float(width), ymin / float(height), xmax / float(width), ymax / float(height)]
+            
+            observer_expression_unique = []
+            gaze_direction = ""
+            gaze_point_expressions = []
+            seg_mask_path = ""
+            
+            image_id_str = os.path.basename(path).split('.')[0]
+
+            if image_id_str in fusion_dict_test:
+                candidates = fusion_dict_test[image_id_str]
+                for cand in candidates:
+                    cand_bbox = cand['head_bbox_norm']
+                    if isinstance(cand_bbox, dict):
+                        cand_bbox = [cand_bbox['x_min'], cand_bbox['y_min'], cand_bbox['x_max'], cand_bbox['y_max']]
+
+                    if is_bbox_match(cand_bbox, current_bbox_norm):
+                        if 'observer_expression' in cand and 'unique' in cand['observer_expression']:
+                            observer_expression_unique = cand['observer_expression']['unique']
+                        
+                        if 'gazes' in cand and len(cand['gazes']) > 0:
+                            gaze_info = cand['gazes'][0]
+                            gaze_direction = gaze_info.get('gaze_direction', "")
+                            gaze_point_expressions = gaze_info.get('gaze_point_expressions', [])
+                            seg_mask_path = gaze_info.get('seg_mask_path', "")
+                        break
+
             gazex_norm = [x for x in row['gaze_x']]
             gazey_norm = [y for y in row['gaze_y']]
             gazex = [x * float(width) for x in row['gaze_x']]
@@ -188,7 +222,11 @@ def main(DATA_PATH):
                 'gazey_norm': gazey_norm,
                 'inout': 1, # all test frames are in frame
                 'num_annot': len(gazex),
-                'head_id': i
+                'head_id': i,
+                'observer_expression': observer_expression_unique,
+                'gaze_direction': gaze_direction,
+                'gaze_point_expressions': gaze_point_expressions,
+                'seg_mask_path': seg_mask_path
             })
         
         TEST_FRAMES.append({
