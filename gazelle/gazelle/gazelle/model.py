@@ -121,7 +121,7 @@ class GazeLLE(nn.Module):
         inout_preds = None
         seg_preds = None
         direction_preds = None
-        expression_preds = None
+        text_preds = None
 
         # ==========================================
         #              SAM 逻辑分支
@@ -193,7 +193,7 @@ class GazeLLE(nn.Module):
                 # 计算标量输出
                 dir_flat = self.direction_head(direction_token_out).squeeze(dim=-1)
                 direction_preds = utils.split_tensors(dir_flat, num_ppl_per_img)
-                text_loss_scalar = self.text_head(fusion_feat = text_token_out, target_ids = input["gaze_point_expression_ids"])
+                text_preds = self.text_head(fusion_feat = text_token_out, target_ids = input["gaze_point_expression_ids"])
 
             # F. 生成 Heatmap (Hypernetwork + Dot Product)
             
@@ -274,7 +274,7 @@ class GazeLLE(nn.Module):
                 "inout": inout_preds,
                 "seg": seg_preds,
                 "direction": direction_preds,
-                "text_loss_scalar": text_loss_scalar}
+                "text_preds": text_preds}
 
     def get_input_head_maps(self, bboxes):
         # bboxes: [[(xmin, ymin, xmax, ymax)]] - list of list of head bboxes per image

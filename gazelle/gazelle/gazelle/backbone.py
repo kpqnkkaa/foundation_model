@@ -258,13 +258,13 @@ class GazeTextDecoder(nn.Module):
             # GPT2 内部会自动计算 Shift Logits 和 Loss
             outputs = self.gpt2(inputs_embeds=inputs_embeds, labels=labels, attention_mask=None)
             
-            return outputs.loss # 直接返回标量 Loss
+            return outputs.loss
 
         # === 推理模式 (简单贪婪搜索或由外部调用 generate) ===
         else:
             # 这里只返回 logits 或者简单的生成逻辑
             # 为了更好的生成效果，建议在 eval 阶段外部调用 .generate()，这里仅作简单演示
-            return self.gpt2(inputs_embeds=visual_embeds)
+            return self.gpt2(inputs_embeds=visual_embeds).logits
 
 class SAMFusion(nn.Module):
     """

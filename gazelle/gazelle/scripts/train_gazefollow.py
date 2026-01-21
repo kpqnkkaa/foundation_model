@@ -166,7 +166,6 @@ def main():
     eval_dataset = GazeDataset('gazefollow', args.data_path, 'test', transform)
     eval_dl = torch.utils.data.DataLoader(eval_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, num_workers=args.n_workers)
 
-    loss_fn = nn.BCELoss()
     # 在 main 函数中定义 optimizer
     # # 将 Fusion 层的参数学习率设低一点 (例如 1e-4)，Head 设高一点 (1e-3)
     # param_dicts = [
@@ -218,25 +217,46 @@ def main():
             imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = batch
 
             optimizer.zero_grad()
-            
-            preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions， "gaze_point_expression_ids": gaze_point_expressions})
+            '
+            # gaze_point_expression_ids用于计算 Text Generation Loss (仅训练时需要)
+            preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions, "gaze_point_expression_ids": gaze_point_expressions})
             
             if isinstance(preds['heatmap'], list):
                  heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
             else:
                  heatmap_preds = preds['heatmap'].squeeze(dim=1)
 
-            loss = loss_fn(heatmap_preds, heatmaps.cuda())
+            if isinstance(preds['text_loss_scalar'], list):
+                text_loss_scalars = torch.stack(preds['text_loss_scalar']).squeeze(dim=1)
+            else:
+                text_loss_scalars = preds['text_loss_scalar'].squeeze(dim=1)
+
+
+            heatmap_loss = criterion_bce(heatmap_preds, heatmaps.cuda())
+            loss = heatmap_loss
+
+            if preds['text_preds'] is not None:
+                text_loss = preds['text_preds']
+                loss += text_loss
+            
+            if preds['seg'] is not None:
+                seg_loss = criterion_bce(preds['seg'], seg_mask_paths.cuda())
+                loss += seg_loss
+
+            if preds['direction'] is not None:
+                direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
+                loss += direction_loss
+
             loss.backward()
             optimizer.step()
             
-            epoch_losses.append(loss.item())
+            epoch_losses.append(heatmap_loss.item())
 
-            pbar.set_postfix({'loss': f"{loss.item():.4f}"})
+            pbar.set_postfix({'heatmap_loss': f"{heatmap_loss.item():.4f}", 'text_loss': f"{text_loss.item():.4f}", 'seg_loss': f"{seg_loss.item():.4f}", 'direction_loss': f"{direction_loss.item():.4f}", 'loss': f"{loss.item():.4f}"})
 
             if cur_iter % args.log_iter == 0:
-                wandb.log({"train/loss": loss.item()})
-                logger.info(f"Iter {cur_iter}/{len(train_dl)}, Loss={loss.item():.4f}")
+                wandb.log({"train/heatmap_loss": heatmap_loss.item(), "train/text_loss": text_loss.item(), "train/seg_loss": seg_loss.item(), "train/direction_loss": direction_loss.item(), "train/loss": loss.item()})
+                logger.info(f"Iter {cur_iter}/{len(train_dl)}, Heatmap Loss={heatmap_loss.item():.4f}, Text Loss={text_loss.item():.4f}, Seg Loss={seg_loss.item():.4f}, Direction Loss={direction_loss.item():.4f}, Loss={loss.item():.4f}")
 
         scheduler.step()
         avg_train_loss = np.mean(epoch_losses)
