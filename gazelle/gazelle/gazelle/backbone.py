@@ -7,7 +7,7 @@ import torchvision.transforms as transforms
 import torch.nn.functional as F
 
 from segment_anything import sam_model_registry
-from transformers import GPT2Model
+from transformers import GPT2Model, GPT2LMHeadModel
 from peft import LoraConfig, get_peft_model, TaskType
 
 # Abstract Backbone class
@@ -201,6 +201,70 @@ class SAMPromptEncoder(nn.Module):
 
         return sparse_embeddings
 
+class GazeTextDecoder(nn.Module):
+    def __init__(self, input_dim=256, model_name="gpt2", lora_r=8, max_len=30):
+        super().__init__()
+        self.max_len = max_len
+        
+        # 1. 加载 GPT2
+        print(f"Loading {model_name} for text generation...")
+        self.gpt2 = GPT2LMHeadModel.from_pretrained(model_name)
+        
+        # 2. 冻结原始参数
+        for param in self.gpt2.parameters():
+            param.requires_grad = False
+            
+        # 3. 注入 LoRA (只训练 LoRA 部分)
+        peft_config = LoraConfig(
+            task_type=TaskType.CAUSAL_LM, 
+            inference_mode=False, 
+            r=lora_r, 
+            lora_alpha=lora_r * 2, 
+            lora_dropout=0.1
+        )
+        self.gpt2 = get_peft_model(self.gpt2, peft_config)
+        self.gpt2.print_trainable_parameters() # 打印一下参数量
+
+        # 4. 投影层: 把 GazeLLE 的特征 (256) 映射到 GPT2 的 embedding (768)
+        self.visual_proj = nn.Linear(input_dim, self.gpt2.config.n_embd)
+
+    def forward(self, fusion_feat, target_ids=None, attention_mask=None):
+        """
+        fusion_feat: [B, dim] 来自 GazeLLE 的 token 输出
+        target_ids:  [B, seq_len] 文本标签的 token ids
+        """
+        # 1. 图像特征投影 -> [B, 1, 768]
+        visual_embeds = self.visual_proj(fusion_feat).unsqueeze(1)
+        
+        # === 训练模式 ===
+        if target_ids is not None:
+            # 获取文本的 Embedding
+            # gpt2.base_model.model... 取决于 peft 的封装层级，
+            # 通常 get_peft_model 包装后，直接用 self.gpt2.get_input_embeddings() 最稳
+            wte = self.gpt2.get_input_embeddings()
+            text_embeds = wte(target_ids) # [B, seq_len, 768]
+            
+            # 拼接: [Visual_Token, Text_Tokens...]
+            inputs_embeds = torch.cat([visual_embeds, text_embeds], dim=1)
+            
+            # 构造 Labels
+            # 我们希望模型根据 visual 预测 text。
+            # Visual 部分的 label 设为 -100 (PyTorch CrossEntropy 忽略)
+            # Text 部分的 label 就是 target_ids
+            dummy_label = torch.full((target_ids.shape[0], 1), -100, device=target_ids.device, dtype=torch.long)
+            labels = torch.cat([dummy_label, target_ids], dim=1)
+            
+            # Forward 计算 Loss
+            # GPT2 内部会自动计算 Shift Logits 和 Loss
+            outputs = self.gpt2(inputs_embeds=inputs_embeds, labels=labels, attention_mask=None)
+            
+            return outputs.loss # 直接返回标量 Loss
+
+        # === 推理模式 (简单贪婪搜索或由外部调用 generate) ===
+        else:
+            # 这里只返回 logits 或者简单的生成逻辑
+            # 为了更好的生成效果，建议在 eval 阶段外部调用 .generate()，这里仅作简单演示
+            return self.gpt2(inputs_embeds=visual_embeds)
 
 class SAMFusion(nn.Module):
     """

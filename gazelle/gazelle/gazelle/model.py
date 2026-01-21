@@ -4,7 +4,7 @@ import torchvision
 from timm.models.vision_transformer import Block
 import math
 import os
-from gazelle.backbone import DinoV2Backbone, SAMBackboneWrapper, SAMImageEncoder
+from gazelle.backbone import DinoV2Backbone, SAMBackboneWrapper, SAMImageEncoder, GazeTextDecoder
 import gazelle.utils as utils
 
 class GazeLLE(nn.Module):
@@ -74,13 +74,7 @@ class GazeLLE(nn.Module):
                     nn.Dropout(0.1),
                     nn.Linear(128, 8)
                 )
-                self.expression_head = nn.Sequential(
-                    nn.Linear(self.dim, 128),
-                    nn.ReLU(),
-                    nn.Dropout(0.1),
-                    nn.Linear(128, 1),
-                    nn.Sigmoid()
-                )
+                self.text_head = GazeTextDecoder(input_dim=self.dim, model_name="gpt2", lora_r=8)
 
         else:
             # ================= Standard 分支初始化 =================
