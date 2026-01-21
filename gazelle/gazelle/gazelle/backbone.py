@@ -30,22 +30,22 @@ class Backbone(nn.Module, ABC):
 
 # Official DINOv2 backbones from torch hub (https://github.com/facebookresearch/dinov2#pretrained-backbones-via-pytorch-hub)
 class DinoV2Backbone(Backbone):
-    def __init__(self, model_name, lora_r=8):
+    def __init__(self, model_name, is_lora=False, lora_r=8):
         super(DinoV2Backbone, self).__init__()
         self.model = torch.hub.load('facebookresearch/dinov2', model_name)
         for param in self.model.parameters():
             param.requires_grad = False
-        # [B, 768, H, W]映射为[B, 256, H, W]
-        # self.proj = nn.Conv2d(768, 256, kernel_size=1)
-        peft_config = LoraConfig(
-            r=lora_r, 
-            lora_alpha=lora_r * 2, 
-            target_modules=["qkv"],  # SAM ViT 中的 attention 投影层通常叫 qkv
-            lora_dropout=0.1, 
-            bias="none"
-        )   
-        self.model = get_peft_model(self.model, peft_config)
-        self.model.print_trainable_parameters()
+        
+        if is_lora:
+            peft_config = LoraConfig(
+                r=lora_r, 
+                lora_alpha=lora_r * 2, 
+                target_modules=["qkv"],  # SAM ViT 中的 attention 投影层通常叫 qkv
+                lora_dropout=0.1, 
+                bias="none"
+            )   
+            self.model = get_peft_model(self.model, peft_config)
+            self.model.print_trainable_parameters()
 
     def forward(self, x):
         b, c, h, w = x.shape
@@ -73,7 +73,7 @@ class DinoV2Backbone(Backbone):
         ])
 
 class SAMImageEncoder(nn.Module):
-    def __init__(self, checkpoint_path, model_type="vit_b", lora_r=8, img_size=448):
+    def __init__(self, checkpoint_path, model_type="vit_b", is_lora=False, lora_r=8, img_size=448):
         super().__init__()
         if sam_model_registry is None: raise ImportError("No segment_anything found.")
         if LoraConfig is None: raise ImportError("No peft found. pip install peft")
@@ -98,15 +98,16 @@ class SAMImageEncoder(nn.Module):
         for param in self.image_encoder.parameters():
             param.requires_grad = False
             
-        peft_config = LoraConfig(
-            r=lora_r, 
-            lora_alpha=lora_r * 2, 
-            target_modules=["qkv"],  # SAM ViT 中的 attention 投影层通常叫 qkv
-            lora_dropout=0.1, 
-            bias="none"
-        )
-        self.image_encoder = get_peft_model(self.image_encoder, peft_config)
-        self.image_encoder.print_trainable_parameters()
+        if is_lora:
+            peft_config = LoraConfig(
+                r=lora_r, 
+                lora_alpha=lora_r * 2, 
+                target_modules=["qkv"],  # SAM ViT 中的 attention 投影层通常叫 qkv
+                lora_dropout=0.1, 
+                bias="none"
+            )
+            self.image_encoder = get_peft_model(self.image_encoder, peft_config)
+            self.image_encoder.print_trainable_parameters()
 
     def get_dimension(self):
         return 256
@@ -136,10 +137,11 @@ class SAMImageEncoder(nn.Module):
 
 
 class SAMPromptEncoder(nn.Module):
-    def __init__(self, checkpoint_path, model_type="vit_b"):
+    def __init__(self, checkpoint_path, model_type="vit_b", is_multi_input=False):
         super().__init__()
         sam_model = sam_model_registry[model_type](checkpoint=checkpoint_path)
         self.prompt_encoder = sam_model.prompt_encoder
+        self.is_multi_input = is_multi_input
         del sam_model.image_encoder
         del sam_model.mask_decoder
         del sam_model
@@ -149,17 +151,27 @@ class SAMPromptEncoder(nn.Module):
         for param in self.prompt_encoder.parameters():
             param.requires_grad = False # 保持冻结，或者是 True 取决于你的策略
 
-    def forward(self, bboxes, device):
+    def forward(self, bboxes, device, eyes=None, expr=None):
         """
         bboxes: Tensor [B, 4] 绝对坐标
         """
+        if self.is_multi_input:
+            assert eyes is not None and expr is not None, "eyes and expr are required for multi-input"
         bs = bboxes.shape[0]
         b_coords = bboxes.reshape(bs, 2, 2)
         # 2: top-left, 3: bottom-right
         b_label = torch.tensor([2, 3], device=device).unsqueeze(0).repeat(bs, 1)
+        if self.is_multi_input:
+            e_coords = eyes.reshape(bs, 2)
+            e_label = torch.ones(bs, 1, device=device)
+            coords = torch.cat([e_coords, b_coords], dim=1)
+            label = torch.cat([e_label, b_label], dim=1)
+        else:
+            coords = b_coords
+            label = b_label
         
         sparse_embeddings, _ = self.prompt_encoder(
-            points=(b_coords, b_label),
+            points=(coords, label),
             boxes=None,
             masks=None
         )
@@ -214,16 +226,22 @@ class SAMFusion(nn.Module):
 
 # --- Wrapper Class for Model Compatibility ---
 class SAMBackboneWrapper(Backbone):
-    def __init__(self, checkpoint_path, model_type="vit_b", lora_r=8, in_size=(448, 448)):
+    def __init__(self, checkpoint_path, model_type="vit_b", lora_r=8, in_size=(448, 448), backbone_type="dinov2", is_lora=False, is_multi_input=False):
         super().__init__()
         self.model_type = model_type
         self.checkpoint_path = checkpoint_path
         self.in_size = in_size
         
         # 实例化三个组件
-        # self.img_encoder = SAMImageEncoder(checkpoint_path, model_type, lora_r, in_size[0])
-        self.img_encoder = DinoV2Backbone('dinov2_vitb14')
-        self.prompt_encoder = SAMPromptEncoder(checkpoint_path, model_type)
+        if backbone_type == "dinov2":
+            if model_type == "vit_b":
+                self.img_encoder = DinoV2Backbone('dinov2_vitb14', is_lora, lora_r)
+            elif model_type == "vit_l":
+                self.img_encoder = DinoV2Backbone('dinov2_vitl14', is_lora, lora_r)
+        elif backbone_type == "sam":
+            self.img_encoder = SAMImageEncoder(checkpoint_path, model_type, is_lora, lora_r, in_size[0])
+
+        self.prompt_encoder = SAMPromptEncoder(checkpoint_path, model_type, is_multi_input)
         self.fusion = SAMFusion(checkpoint_path, model_type)
         
     def forward(self, x):
