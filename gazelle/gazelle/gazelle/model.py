@@ -81,13 +81,6 @@ class GazeLLE(nn.Module):
                     nn.Linear(128, 1),
                     nn.Sigmoid()
                 )
-                self.seg_head = nn.Sequential(
-                    nn.Linear(self.dim, 128),
-                    nn.ReLU(),
-                    nn.Dropout(0.1),
-                    nn.Linear(128, 1),
-                    nn.Sigmoid()
-                )
 
         else:
             # ================= Standard 分支初始化 =================
@@ -132,6 +125,9 @@ class GazeLLE(nn.Module):
         
         heatmap_preds = []
         inout_preds = None
+        seg_preds = None
+        direction_preds = None
+        expression_preds = None
 
         # ==========================================
         #              SAM 逻辑分支
@@ -179,65 +175,62 @@ class GazeLLE(nn.Module):
             # 注意：确保 backbone.py 中的 SAMFusion 返回顺序也是 (image, tokens)
             src, hs = self.backbone.fusion(image_embeddings=x, tokens=tokens)
             
-            # E. 提取 Token 进行预测
+            current_idx = 0 # 使用指针，不管是否有 inout 都能对齐
+            
+            # 1. InOut 任务
             if self.inout:
-                # 约定: token 0 是 InOut, token 1 是 Heatmap
-                inout_token_out = hs[:, 0, :] 
-                heatmap_token_out = hs[:, 1, :]
-                # 预测 InOut
+                inout_token_out = hs[:, current_idx, :]
                 inout_preds_flat = self.inout_head(inout_token_out).squeeze(dim=-1)
                 inout_preds = utils.split_tensors(inout_preds_flat, num_ppl_per_img)
-                if self.is_multi_output:
-                    seg_token_out = hs[:, 2, :]
-                    direction_token_out = hs[:, 3, :]
-                    expression_token_out = hs[:, 4, :]
-                    direction_preds_flat = self.direction_head(direction_token_out).squeeze(dim=-1)
-                    expression_preds_flat = self.expression_head(expression_token_out).squeeze(dim=-1)
-                    direction_preds = utils.split_tensors(direction_preds_flat, num_ppl_per_img)
-                    expression_preds = utils.split_tensors(expression_preds_flat, num_ppl_per_img)
-            else:
-                # 只有 Heatmap Token
-                heatmap_token_out = hs[:, 0, :]
-                if self.is_multi_output:
-                    seg_token_out = hs[:, 1, :]
-                    direction_token_out = hs[:, 2, :]
-                    expression_token_out = hs[:, 3, :]
-                    direction_preds_flat = self.direction_head(direction_token_out).squeeze(dim=-1)
-                    expression_preds_flat = self.expression_head(expression_token_out).squeeze(dim=-1)
-                    direction_preds = utils.split_tensors(direction_preds_flat, num_ppl_per_img)
-                    expression_preds = utils.split_tensors(expression_preds_flat, num_ppl_per_img)
+                current_idx += 1
+            
+            # 2. Heatmap Token (必须存在)
+            heatmap_token_out = hs[:, current_idx, :]
+            current_idx += 1
+            
+            # 3. Multi Output Tokens
+            seg_token_out = None
+            if self.is_multi_output:
+                seg_token_out = hs[:, current_idx, :]      # Seg
+                direction_token_out = hs[:, current_idx+1, :] # Dir
+                expression_token_out = hs[:, current_idx+2, :] # Expr
+                current_idx += 3 # 虽然不用了，但保持习惯
+                
+                # 计算标量输出
+                dir_flat = self.direction_head(direction_token_out).squeeze(dim=-1)
+                expr_flat = self.expression_head(expression_token_out).squeeze(dim=-1)
+                direction_preds = utils.split_tensors(dir_flat, num_ppl_per_img)
+                expression_preds = utils.split_tensors(expr_flat, num_ppl_per_img)
 
             # F. 生成 Heatmap (Hypernetwork + Dot Product)
             
             # 1. 上采样图像特征 -> [Total_People, 32, H*4, W*4]
             upscaled_embedding = self.output_upscaling(src)
-            
-            # 2. 生成动态权重 -> [Total_People, 32]
-            # 【关键】直接使用 Backbone 中加载了预训练权重的 MLP
-            # SAM 的 output_hypernetworks_mlps 是一个 ModuleList，我们取第0个（对应Mask Token）
-            mlp_layer = self.backbone.fusion.output_hypernetworks_mlps[0]
-            hyper_weights = mlp_layer(heatmap_token_out)
-            
-            # 3. 点积 (Dynamic Convolution)
             b, c, h, w = upscaled_embedding.shape
-            # (B, 1, C) @ (B, C, H*W) -> (B, 1, H*W)
-            heatmap = (hyper_weights.unsqueeze(1) @ upscaled_embedding.view(b, c, h * w))
-            heatmap = heatmap.view(b, 1, h, w) 
+
+            # 获取 SAM 内部所有的 MLP 层 (通常有 4 个)
+            mlp_layers = self.backbone.fusion.output_hypernetworks_mlps
+
+            # --- 生成 Heatmap (使用第 0 个 MLP) ---
+            heatmap_mlp = mlp_layers[0] 
+            hyper_weights = heatmap_mlp(heatmap_token_out)
             
-            # 4. 调整尺寸并激活
+            heatmap = (hyper_weights.unsqueeze(1) @ upscaled_embedding.view(b, c, h * w))
+            heatmap = heatmap.view(b, 1, h, w)
             if heatmap.shape[-2:] != self.out_size:
                 heatmap = F.interpolate(heatmap, size=self.out_size, mode='bilinear', align_corners=False)
-            
             heatmap = torch.sigmoid(heatmap).squeeze(1)
-            
-            # 将 Tensor 拆回 List [B_img1, B_img2...]
             heatmap_preds = utils.split_tensors(heatmap, num_ppl_per_img)
-
-            # seg
-            if self.is_multi_output:
-                seg_hyper_weights = mlp_layer(seg_token_out)
-                seg = (seg_hyper_weights.unsqueeze(1) @ upscaled_embedding.view(b, c, h * w))
-                seg = seg.view(b, 1, h, w) 
+            
+            # --- 生成 Seg (使用第 1 个 MLP) ---
+            if self.is_multi_output and seg_token_out is not None:
+                # 关键：使用 index 1，与 Heatmap 区分开
+                seg_mlp = mlp_layers[1] 
+                
+                seg_weights = seg_mlp(seg_token_out)
+                
+                seg = (seg_weights.unsqueeze(1) @ upscaled_embedding.view(b, c, h * w))
+                seg = seg.view(b, 1, h, w)
                 if seg.shape[-2:] != self.out_size:
                     seg = F.interpolate(seg, size=self.out_size, mode='bilinear', align_corners=False)
                 seg = torch.sigmoid(seg).squeeze(1)
@@ -284,7 +277,11 @@ class GazeLLE(nn.Module):
             x = x.squeeze(1)
             heatmap_preds = utils.split_tensors(x, num_ppl_per_img)
 
-        return {"heatmap": heatmap_preds, "inout": inout_preds}
+        return {"heatmap": heatmap_preds, 
+                "inout": inout_preds,
+                "seg": seg_preds,
+                "direction": direction_preds,
+                "expression": expression_preds}
 
     def get_input_head_maps(self, bboxes):
         # bboxes: [[(xmin, ymin, xmax, ymax)]] - list of list of head bboxes per image
