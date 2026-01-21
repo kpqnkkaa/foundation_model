@@ -74,7 +74,7 @@ class GazeLLE(nn.Module):
                     nn.Dropout(0.1),
                     nn.Linear(128, 8)
                 )
-                self.text_head = GazeTextDecoder(input_dim=self.dim, model_name="gpt2", lora_r=8)
+                self.text_head = GazeTextDecoder(input_dim=self.dim, model_name="gpt2", lora_r=8, max_len=30)
 
         else:
             # ================= Standard 分支初始化 =================
@@ -152,7 +152,7 @@ class GazeLLE(nn.Module):
             
             # B. 获取 Sparse Embeddings (通过 Backbone 的 Prompt Encoder)
             # [Total_People, N_sparse, dim]
-            sparse_embeddings = self.backbone.prompt_encoder(bboxes_tensor, device=x.device, eyes=eyes_tensor, expr_ids=input["expr_ids"])
+            sparse_embeddings = self.backbone.prompt_encoder(bboxes_tensor, device=x.device, eyes=eyes_tensor, expr_ids=input["observer_expression_ids"])
             
             # C. 准备 Learnable Tokens
             # tokens: [Total_People, Num_Tokens, dim]
@@ -187,14 +187,13 @@ class GazeLLE(nn.Module):
             if self.is_multi_output:
                 seg_token_out = hs[:, current_idx, :]      # Seg
                 direction_token_out = hs[:, current_idx+1, :] # Dir
-                expression_token_out = hs[:, current_idx+2, :] # Expr
+                text_token_out = hs[:, current_idx+2, :] # Text
                 current_idx += 3 # 虽然不用了，但保持习惯
                 
                 # 计算标量输出
                 dir_flat = self.direction_head(direction_token_out).squeeze(dim=-1)
-                expr_flat = self.expression_head(expression_token_out).squeeze(dim=-1)
                 direction_preds = utils.split_tensors(dir_flat, num_ppl_per_img)
-                expression_preds = utils.split_tensors(expr_flat, num_ppl_per_img)
+                text_loss_scalar = self.text_head(fusion_feat = text_token_out, target_ids = input["gaze_point_expression_ids"])
 
             # F. 生成 Heatmap (Hypernetwork + Dot Product)
             
@@ -275,7 +274,7 @@ class GazeLLE(nn.Module):
                 "inout": inout_preds,
                 "seg": seg_preds,
                 "direction": direction_preds,
-                "expression": expression_preds}
+                "text_loss_scalar": text_loss_scalar}
 
     def get_input_head_maps(self, bboxes):
         # bboxes: [[(xmin, ymin, xmax, ymax)]] - list of list of head bboxes per image

@@ -32,14 +32,15 @@ args = parser.parse_args()
 # --- 自定义多卡包装器 (终极修复版) ---
 class DataParallelWrapper(nn.DataParallel):
     def forward(self, input_dict):
-        # input_dict 是 main 函数里传进来的那个字典
-        images = input_dict['images'] # Tensor [Batch, ...]
-        bboxes = input_dict['bboxes'] # List [Batch, ...]
-        eyes = input_dict['eyes'] # Tensor [Batch, ...]
-        expr_ids = input_dict['expr_ids'] # Tensor [Batch, ...]
+        # 1. 自动获取 Batch Size (假设 input_dict 里至少有一个 key 是 Tensor 或 List)
+        # 通常我们用 'images' 来确定 batch size
+        if 'images' in input_dict:
+            batch_size = input_dict['images'].shape[0]
+        else:
+            #以此类推，找一个存在的key
+            first_key = next(iter(input_dict))
+            batch_size = len(input_dict[first_key])
 
-        # 1. 手动切分数据
-        batch_size = images.shape[0]
         num_replicas = len(self.device_ids)
         split_size = (batch_size + num_replicas - 1) // num_replicas
 
@@ -51,26 +52,33 @@ class DataParallelWrapper(nn.DataParallel):
             if start_idx >= end_idx:
                 break
             
-            # 获取当前切片应该去的目标显卡
             target_device = self.device_ids[i]
+            replica_dict = {}
+
+            # ==========================================
+            # 【修改点】: images 也放进循环统一处理
+            # ==========================================
+            for k, v in input_dict.items():
+                # 处理 Tensor (images, eyes, expr_ids, expression_ids 等)
+                if isinstance(v, torch.Tensor):
+                    replica_dict[k] = v[start_idx:end_idx].to(target_device)
+                
+                # 处理 List (bboxes 等)
+                elif isinstance(v, list):
+                    replica_dict[k] = v[start_idx:end_idx]
+                
+                # 处理 None (比如 eval 时 expression_ids 为 None)
+                elif v is None:
+                    replica_dict[k] = None
             
-            replica_dict = {
-                # 关键修复：显式移动 Tensor 到目标显卡
-                "images": images[start_idx:end_idx].to(target_device),
-                "bboxes": bboxes[start_idx:end_idx]
-                "eyes": eyes[start_idx:end_idx],
-                "expr_ids": observer_expressions[start_idx:end_idx],
-            }
-            # 关键修复：包装进 Tuple，防止解包错误
+            # 包装进 tuple
             replicas_inputs.append((replica_dict,))
 
         # 2. 复制模型并并行前向传播
         replicas = self.replicate(self.module, self.device_ids[:len(replicas_inputs)])
-        
-        # 关键修复：传入 None 作为 kwargs
         outputs = self.parallel_apply(replicas, replicas_inputs, None)
         
-        # 3. 手动收集结果 (Custom Gather)
+        # 3. 手动收集结果
         gathered_output = {}
         if len(outputs) > 0:
             for key in outputs[0].keys():
@@ -80,21 +88,33 @@ class DataParallelWrapper(nn.DataParallel):
                     gathered_output[key] = None
                     continue
                     
-                # 处理 List 类型 (heatmap, inout 等)
-                if isinstance(first_val, list):
-                    merged_list = []
-                    for out in outputs:
-                        val_list = out[key]
-                        device_adjusted_list = [t.to(self.output_device) for t in val_list]
-                        merged_list.extend(device_adjusted_list)
-                    gathered_output[key] = merged_list
-                
-                # 处理 Tensor 类型 (如果有的话)
-                elif isinstance(first_val, torch.Tensor):
+                # ==========================================
+                # 【修改点】: 专门处理 expression_loss (Scalar)
+                # ==========================================
+                # 如果是 0 维 Tensor (Scalar)，说明是 Loss，取平均
+                if isinstance(first_val, torch.Tensor) and first_val.ndim == 0:
+                     # 将各卡上的 loss stack 起来取 mean，并转回主卡
+                     stacked_loss = torch.stack([out[key].to(self.output_device) for out in outputs])
+                     gathered_output[key] = stacked_loss.mean()
+
+                # 处理普通 Tensor (logits, heatmaps 等，维度 > 0)
+                elif isinstance(first_val, torch.Tensor) and first_val.ndim > 0:
                     gathered_output[key] = torch.cat(
                         [out[key].to(self.output_device) for out in outputs], dim=0
                     )
-        
+
+                # 处理 List
+                elif isinstance(first_val, list):
+                    merged_list = []
+                    for out in outputs:
+                        val_list = out[key]
+                        # 只有 tensor list 需要 .to()，普通 list 不用
+                        if len(val_list) > 0 and isinstance(val_list[0], torch.Tensor):
+                            merged_list.extend([t.to(self.output_device) for t in val_list])
+                        else:
+                            merged_list.extend(val_list)
+                    gathered_output[key] = merged_list
+                
         return gathered_output
 
 # --- 日志设置函数 ---

@@ -33,6 +33,7 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
         self.in_frame_only = in_frame_only
         self.sample_rate = sample_rate
         self.expr_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        self.expr_tokenizer.pad_token = self.expr_tokenizer.eos_token
         
         if dataset_name == "gazefollow":
             self.data = load_data_gazefollow(os.path.join(self.path, "{}_preprocessed.json".format(split)))
