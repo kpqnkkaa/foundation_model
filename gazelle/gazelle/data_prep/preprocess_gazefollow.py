@@ -62,7 +62,6 @@ def main(DATA_PATH):
             gazex_norm = row['gaze_x'][i]
             gazey_norm = row['gaze_y'][i]
 
-
             if xmin > xmax:
                 temp = xmin
                 xmin = xmax
@@ -109,6 +108,7 @@ def main(DATA_PATH):
             heads.append({
                 'bbox': [xmin, ymin, xmax, ymax],
                 'bbox_norm': [xmin / float(width), ymin / float(height), xmax / float(width), ymax / float(height)],
+                'eye_norm': [row['eye_x'][i], row['eye_y'][i]],
                 'inout': row['inout'][i],
                 'gazex': [gazex], # convert to list for consistency with multi-annotation format
                 'gazey': [gazey],

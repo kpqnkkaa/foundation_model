@@ -1,3 +1,5 @@
+import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
@@ -5,6 +7,7 @@ import torchvision.transforms as transforms
 import torch.nn.functional as F
 
 from segment_anything import sam_model_registry
+from transformers import GPT2Model
 from peft import LoraConfig, get_peft_model, TaskType
 
 # Abstract Backbone class
@@ -279,6 +282,14 @@ class SAMBackboneWrapper(Backbone):
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             transforms.Resize(in_size),
         ])
+   
+# === 新增：SAM 权重自动下载逻辑 ===
+
+SAM_URLS = {
+    "vit_b": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth",
+    "vit_l": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_l_0b3195.pth",
+    "vit_h": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth",
+}
 
 def get_sam_checkpoint_path(model_type):
     """

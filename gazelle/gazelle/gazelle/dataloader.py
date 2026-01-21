@@ -1,3 +1,5 @@
+import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import torch
 import json
 import os
@@ -5,7 +7,6 @@ import copy
 from PIL import Image
 import numpy as np
 from transformers import GPT2Tokenizer
-
 import gazelle.utils as utils
 
 def load_data_vat(file, sample_rate):
@@ -51,7 +52,7 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
         img_data = self.data[img_idx]
         head_data = copy.deepcopy(img_data['heads'][head_idx])
         bbox_norm = head_data['bbox_norm']
-        eye_norm = head_data['eye_norm']
+        eye_norm = head_data['eye_norm'] if 'eye_norm' in head_data else None
         gazex_norm = head_data['gazex_norm']
         gazey_norm = head_data['gazey_norm']
         inout = head_data['inout']
