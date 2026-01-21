@@ -4,7 +4,7 @@ import torchvision
 from timm.models.vision_transformer import Block
 import math
 import os
-from gazelle.backbone import DinoV2Backbone, SAMBackboneWrapper
+from gazelle.backbone import DinoV2Backbone, SAMBackboneWrapper, SAMImageEncoder
 import gazelle.utils as utils
 
 class GazeLLE(nn.Module):
@@ -303,9 +303,10 @@ def get_gazelle_model(model_name):
         "gazelle_dinov2_vitl14_inout": gazelle_dinov2_vitl14_inout,
         # 新增sam模型
         "gazelle_sam_vitb": gazelle_sam_vitb,
-        "sam_dinov2_vitb": sam_dinov2_vitb14,
-        "sam_sam_vitb": sam_sam_vitb,
-        "sam_sam_vitb_multi_input": sam_sam_vitb_multi_input,
+        "sam_dinov2_vitb": sam_dinov2_vitb,
+        "sam_dinov2_vitb_lora": sam_dinov2_vitb_lora,
+        "sam_sam_vitb_lora": sam_sam_vitb_lora,
+        "sam_sam_vitb_lora_multi_input": sam_sam_vitb_lora_multi_input,
     }
     assert model_name in factory.keys(), "invalid model name"
     return factory[model_name]()
@@ -334,6 +335,39 @@ def gazelle_dinov2_vitl14_inout():
     model = GazeLLE(backbone, inout=True)
     return model, transform
 
+def gazelle_sam_vitb():
+    backbone = SAMImageEncoder(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448))
+    transform = backbone.get_transform((448, 448))
+    model = GazeLLE(backbone, inout=False)
+    return model, transform
+
+def sam_dinov2_vitb():
+    # 自动获取路径，不存在则下载
+    checkpoint = get_sam_checkpoint_path("vit_b")
+    
+    backbone = SAMBackboneWrapper(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=False, is_multi_input=False)
+    transform = backbone.get_transform((448, 448))
+    model = GazeLLE(backbone, inout=False)
+    return model, transform
+
+def sam_dinov2_vitb_lora():
+    backbone = SAMBackboneWrapper(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=False)
+    transform = backbone.get_transform((448, 448))
+    model = GazeLLE(backbone, inout=False)
+    return model, transform
+
+def sam_sam_vitb_lora():
+    backbone = SAMBackboneWrapper(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=True, is_multi_input=False)
+    transform = backbone.get_transform((448, 448))
+    model = GazeLLE(backbone, inout=False)
+    return model, transform
+
+def sam_sam_vitb_lora_multi_input():
+    backbone = SAMBackboneWrapper(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=True, is_multi_input=True)
+    transform = backbone.get_transform((448, 448))
+    model = GazeLLE(backbone, inout=False)
+    return model, transform
+   
 # === 新增：SAM 权重自动下载逻辑 ===
 
 SAM_URLS = {
@@ -366,24 +400,3 @@ def get_sam_checkpoint_path(model_type):
         print(f"Found existing SAM checkpoint at {filepath}")
 
     return filepath
-
-
-# === 更新后的工厂函数 ===
-
-def sam_vitb():
-    # 自动获取路径，不存在则下载
-    checkpoint = get_sam_checkpoint_path("vit_b")
-    
-    backbone = SAMBackboneWrapper(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448))
-    transform = backbone.get_transform((448, 448))
-    model = GazeLLE(backbone, inout=False)
-    return model, transform
-
-def sam_vitb_inout():
-    # 自动获取路径，不存在则下载
-    checkpoint = get_sam_checkpoint_path("vit_b")
-    
-    backbone = SAMBackboneWrapper(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448))
-    transform = backbone.get_transform((448, 448))
-    model = GazeLLE(backbone, inout=True)
-    return model, transform
