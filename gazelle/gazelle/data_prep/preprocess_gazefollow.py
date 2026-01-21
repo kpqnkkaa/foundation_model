@@ -8,12 +8,35 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_path", type=str, default="/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended")
+parser.add_argument("--fusion_path", type=str, default="/mnt/nvme1n1/lululemon/xjj/result/information_fusion")
 args = parser.parse_args()
 
+def load_fusion_data(fusion_path, json_filename):
+    full_path = os.path.join(fusion_path, json_filename)
+    print(f"Loading fusion data from {full_path}...")
+    with open(full_path, 'r') as f:
+        data = json.load(f)
+    
+    # 构建字典：key=image_id (例如 '00032486'), value=list of persons
+    fusion_dict = {}
+    for item in data:
+        # 提取图片ID，假设 index 格式为 "00032486_person0"
+        image_id = item['index'].split('_')[0] 
+        if image_id not in fusion_dict:
+            fusion_dict[image_id] = []
+        fusion_dict[image_id].append(item)
+    return fusion_dict
+
+def is_bbox_match(bbox1, bbox2, threshold=0.01):
+    # 比较两个归一化 bbox 是否接近
+    return all(abs(b1 - b2) < threshold for b1, b2 in zip(bbox1, bbox2))
 
 def main(DATA_PATH):
 
     # TRAIN
+    train_fusion_file = "merged_GazeFollow_train_EN_Qwen_Qwen3-VL-32B-Instruct_with_SEG.json"
+    fusion_dict_train = load_fusion_data(args.fusion_path, train_fusion_file)
+
     train_csv_path = os.path.join(DATA_PATH, "train_annotations_release.txt")
     column_names = ['path', 'idx', 'body_bbox_x', 'body_bbox_y', 'body_bbox_w', 'body_bbox_h', 'eye_x', 'eye_y',
                                 'gaze_x', 'gaze_y', 'bbox_x_min', 'bbox_y_min', 'bbox_x_max', 'bbox_y_max', 'inout', 'source', 'meta']
@@ -24,8 +47,6 @@ def main(DATA_PATH):
     multiperson_ex = 0
     TRAIN_FRAMES = []
     for path, row in df.iterrows():
-        # path的是train/00000032/00032486.jpg，我们找到fusion_path+./merged_GazeFollow_test_EN_Qwen_Qwen3-VL-32B-Instruct_with_SEG.json
-        # fusion_path在args设置，默认值是/mnt/nvme1n1/lululemon/xjj/result/information_fusion
         img_path = os.path.join(DATA_PATH, path)
         img = Image.open(img_path)
         width, height = img.size
@@ -58,6 +79,29 @@ def main(DATA_PATH):
             xmax = min(xmax, width)
             ymax = min(ymax, height)
 
+            current_bbox_norm = [xmin / float(width), ymin / float(height), xmax / float(width), ymax / float(height)]
+            observer_expression_unique = []
+            gaze_direction = ""
+            gaze_point_expressions = []
+            seg_mask_path = ""
+
+            image_id_str = os.path.basename(path).split('.')[0]
+            if image_id_str in fusion_dict_train:
+                candidates = fusion_dict_train[image_id_str]
+                for cand in candidates:
+                    # 对比 bbox (容差 0.01)
+                    if 'head_bbox_norm' in cand and is_bbox_match(cand['head_bbox_norm'], current_bbox_norm):
+                        # 提取数据
+                        if 'observer_expression' in cand and 'unique' in cand['observer_expression']:
+                            observer_expression_unique = cand['observer_expression']['unique']
+                        
+                        if 'gazes' in cand and len(cand['gazes']) > 0:
+                            gaze_info = cand['gazes'][0]
+                            gaze_direction = gaze_info.get('gaze_direction', "")
+                            gaze_point_expressions = gaze_info.get('gaze_point_expressions', [])
+                            seg_mask_path = gaze_info.get('seg_mask_path', "")
+                        break # 找到对应的人，停止查找
+
             heads.append({
                 'bbox': [xmin, ymin, xmax, ymax],
                 'bbox_norm': [xmin / float(width), ymin / float(height), xmax / float(width), ymax / float(height)],
@@ -66,7 +110,11 @@ def main(DATA_PATH):
                 'gazey': [gazey],
                 'gazex_norm': [gazex_norm],
                 'gazey_norm': [gazey_norm],
-                'head_id': i
+                'head_id': i,
+                'observer_expression': observer_expression_unique,
+                'gaze_direction': gaze_direction,
+                'gaze_point_expressions': gaze_point_expressions,
+                'seg_mask_path': seg_mask_path
             })
         TRAIN_FRAMES.append({
             'path': path,
