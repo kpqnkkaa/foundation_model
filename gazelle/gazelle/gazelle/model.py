@@ -8,12 +8,13 @@ from gazelle.backbone import DinoV2Backbone, SAMBackboneWrapper, SAMImageEncoder
 import gazelle.utils as utils
 
 class GazeLLE(nn.Module):
-    def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64)):
+    def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64), is_multi_output=False):
         super().__init__()
         self.backbone = backbone
         self.dim = dim
         self.num_layers = num_layers
-        
+        self.is_multi_output = is_multi_output
+
         # 获取 Backbone 输出特征图尺寸 (例如 448输入 -> 14x14 或 28x28)
         self.featmap_h, self.featmap_w = backbone.get_out_size(in_size)
         
@@ -38,6 +39,11 @@ class GazeLLE(nn.Module):
             # Tokens: 如果有 inout，则需要 2 个 token [InOut, Heatmap]，否则 1 个 [Heatmap]
             self.num_output_tokens = 2 if self.inout else 1
             self.output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
+
+            # 要输出分割，方向分类，expression的结果
+            if self.is_multi_output:
+                self.num_output_tokens = 3
+                self.multi_output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
             
             # Upscaling Head: 
             # 负责将融合后的图像特征 (256维) 上采样并降维到 32维
@@ -139,6 +145,9 @@ class GazeLLE(nn.Module):
             # C. 准备 Learnable Tokens
             # tokens: [Total_People, Num_Tokens, dim]
             tokens = self.output_tokens.weight.unsqueeze(0).repeat(x.shape[0], 1, 1)
+            if self.is_multi_output:
+                multi_output_tokens = self.multi_output_tokens.weight.unsqueeze(0).repeat(x.shape[0], 1, 1)
+                tokens = torch.cat((tokens, multi_output_tokens), dim=1)
             # 拼接: [Tokens, Sparse_Prompts]
             tokens = torch.cat((tokens, sparse_embeddings), dim=1)
 
@@ -312,6 +321,7 @@ def get_gazelle_model(model_name):
         "sam_dinov2_vitb_lora": sam_dinov2_vitb_lora,
         "sam_sam_vitb_lora": sam_sam_vitb_lora,
         "sam_dinov2_vitb_lora_multi_input": sam_dinov2_vitb_lora_multi_input,
+        "sam_dinov2_vitb_lora_multi_input_inout": sam_dinov2_vitb_lora_multi_input_inout,
     }
     assert model_name in factory.keys(), "invalid model name"
     return factory[model_name]()
@@ -371,4 +381,10 @@ def sam_dinov2_vitb_lora_multi_input():
     backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=True)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
+    return model, transform
+    
+def sam_dinov2_vitb_lora_multi_input_inout():
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=True)
+    transform = backbone.get_transform((448, 448))
+    model = GazeLLE(backbone, inout=True, is_multi_output=True)
     return model, transform
