@@ -17,7 +17,7 @@ from gazelle.model import get_gazelle_model
 from gazelle.utils import gazefollow_auc, gazefollow_l2
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default="sam_sam_vitb_lora_multi_input")
+parser.add_argument('--model', type=str, default="sam_dinov2_vitb_lora")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--ckpt_save_dir', type=str, default='./experiments')
 parser.add_argument('--wandb_project', type=str, default='sam_sam_vitb_lora_multi_input')
@@ -192,7 +192,7 @@ def main():
 
             optimizer.zero_grad()
             
-            preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes.cuda(), "expr_ids": observer_expressions.cuda()})
+            preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "expr_ids": observer_expressions})
             
             if isinstance(preds['heatmap'], list):
                  heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
@@ -238,7 +238,7 @@ def main():
             imgs, bboxes, eyes,gazex, gazey, inout, heights, widths, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = batch
 
             with torch.no_grad():
-                preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes.cuda(), "expr_ids": observer_expressions.cuda()})
+                preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "expr_ids": observer_expressions})
 
             if isinstance(preds['heatmap'], list):
                  heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)

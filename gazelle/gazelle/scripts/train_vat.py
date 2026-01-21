@@ -187,7 +187,7 @@ def main():
             
             # 使用包装器处理输入
             # wrapper 会负责分发到 gpu1 并移回结果
-            preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": None, "expr_ids": observer_expressions.cuda()})
+            preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": None, "expr_ids": observer_expressions})
             
             # 处理多卡返回结果
             # 经过 Custom Gather 后，preds['heatmap'] 是一个长度为 Batch Size 的扁平 List
@@ -252,7 +252,7 @@ def main():
             imgs, bboxes, eyes, gazex, gazey, inout, heights, widths = batch
 
             with torch.no_grad():
-                preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": None, "expr_ids": observer_expressions.cuda()})
+                preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": None, "expr_ids": observer_expressions})
 
             if isinstance(preds['heatmap'], list):
                 heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)

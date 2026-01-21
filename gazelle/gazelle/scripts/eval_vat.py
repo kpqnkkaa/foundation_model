@@ -71,7 +71,7 @@ def main():
     inout_gts = []
 
     for _, (images, bboxes, eyes, gazex, gazey, inout) in tqdm(enumerate(dataloader), desc="Evaluating", total=len(dataloader)):
-        preds = model.forward({"images": images.to(device), "bboxes": bboxes, "eyes": None, "expr_ids": observer_expressions.to(device)})
+        preds = model.forward({"images": images.to(device), "bboxes": bboxes, "eyes": None, "expr_ids": observer_expressions})
         
         # eval each instance (head)
         for i in range(images.shape[0]): # per image
