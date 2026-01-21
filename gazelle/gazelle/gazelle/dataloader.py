@@ -63,14 +63,14 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
             observer_expression = np.random.choice(observer_expression_list)
         else:
             observer_expression = ""
-        observer_expression_ids = self.expr_tokenizer.encode(observer_expression, add_special_tokens=False)
+        observer_expression_ids = self.expr_tokenizer.encode(observer_expression, max_length=25, padding="max_length", truncation=True)
 
         gaze_point_expressions_list = head_data.get('gaze_point_expressions')
         if gaze_point_expressions_list and isinstance(gaze_point_expressions_list, list) and len(gaze_point_expressions_list) > 0:
             gaze_point_expression = np.random.choice(gaze_point_expressions_list)
         else:
             gaze_point_expression = ""
-        gaze_point_expression_ids = self.expr_tokenizer.encode(gaze_point_expression, add_special_tokens=False)
+        gaze_point_expression_ids = self.expr_tokenizer.encode(gaze_point_expression, max_length=25, padding="max_length", truncation=True)
 
         direction_map = {
             "right": 0, "top-right": 1, "above": 2, "top-left": 3,

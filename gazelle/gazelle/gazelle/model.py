@@ -74,7 +74,7 @@ class GazeLLE(nn.Module):
                     nn.Dropout(0.1),
                     nn.Linear(128, 8)
                 )
-                self.text_head = GazeTextDecoder(input_dim=self.dim, model_name="gpt2", lora_r=8, max_len=30)
+                self.text_head = GazeTextDecoder(input_dim=self.dim, model_name="gpt2", lora_r=8, max_len=25)
 
         else:
             # ================= Standard 分支初始化 =================
