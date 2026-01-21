@@ -5,7 +5,7 @@ import torchvision.transforms as transforms
 import torch.nn.functional as F
 
 from segment_anything import sam_model_registry
-from peft import LoraConfig, get_peft_model
+from peft import LoraConfig, get_peft_model, TaskType
 
 # Abstract Backbone class
 class Backbone(nn.Module, ABC):
@@ -137,7 +137,7 @@ class SAMImageEncoder(nn.Module):
 
 
 class SAMPromptEncoder(nn.Module):
-    def __init__(self, checkpoint_path, model_type="vit_b", is_multi_input=False):
+    def __init__(self, checkpoint_path, model_type="vit_b", is_multi_input=False, is_lora=False, lora_r=8):
         super().__init__()
         sam_model = sam_model_registry[model_type](checkpoint=checkpoint_path)
         self.prompt_encoder = sam_model.prompt_encoder
@@ -147,23 +147,32 @@ class SAMPromptEncoder(nn.Module):
         del sam_model
         
         # # 通常 Prompt Encoder 不需要训练，或者是跟随整体微调
-        # # 如果需要训练，确保 requires_grad = True
         for param in self.prompt_encoder.parameters():
             param.requires_grad = False # 保持冻结，或者是 True 取决于你的策略
+        if is_multi_input:
+            self.text_encoder = GPT2Model.from_pretrained("gpt2")
+            if is_lora:
+                peft_config = LoraConfig(
+                    task_type=TaskType.FEATURE_EXTRACTION, 
+                    r=lora_r, lora_alpha=lora_r * 2, 
+                    target_modules=["c_attn"], lora_dropout=0.1, bias="none"
+                )
+                self.text_encoder = get_peft_model(self.text_encoder, peft_config)
+            self.text_proj = nn.Linear(768, 256) 
 
-    def forward(self, bboxes, device, eyes=None, expr=None):
+    def forward(self, bboxes, device, eyes=None, expr_ids=None):
         """
         bboxes: Tensor [B, 4] 绝对坐标
         """
         if self.is_multi_input:
-            assert eyes is not None and expr is not None, "eyes and expr are required for multi-input"
+            assert eyes is not None and expr_ids is not None, "eyes and expr_ids are required for multi-input"
         bs = bboxes.shape[0]
         b_coords = bboxes.reshape(bs, 2, 2)
         # 2: top-left, 3: bottom-right
         b_label = torch.tensor([2, 3], device=device).unsqueeze(0).repeat(bs, 1)
         if self.is_multi_input:
-            e_coords = eyes.reshape(bs, 2)
-            e_label = torch.ones(bs, 1, device=device)
+            e_coords = eyes.unsqueeze(1) 
+            e_label = torch.ones(bs, 1, device=device) 
             coords = torch.cat([e_coords, b_coords], dim=1)
             label = torch.cat([e_label, b_label], dim=1)
         else:
@@ -175,6 +184,13 @@ class SAMPromptEncoder(nn.Module):
             boxes=None,
             masks=None
         )
+        
+        if self.is_multi_input:
+            gpt_out = self.text_encoder(expr_ids)[0] # [B, L, 768]
+            text_feat = gpt_out.mean(dim=1) # [B, 768]
+            text_embed = self.text_proj(text_feat).unsqueeze(1) # [B, 1, 256]
+            sparse_embeddings = torch.cat([sparse_embeddings, text_embed], dim=1)
+
         return sparse_embeddings
 
 
@@ -241,7 +257,7 @@ class SAMBackboneWrapper(Backbone):
         elif backbone_type == "sam":
             self.img_encoder = SAMImageEncoder(checkpoint_path, model_type, is_lora, lora_r, in_size[0])
 
-        self.prompt_encoder = SAMPromptEncoder(checkpoint_path, model_type, is_multi_input)
+        self.prompt_encoder = SAMPromptEncoder(checkpoint_path, model_type, is_multi_input, is_lora, lora_r)
         self.fusion = SAMFusion(checkpoint_path, model_type)
         
     def forward(self, x):
