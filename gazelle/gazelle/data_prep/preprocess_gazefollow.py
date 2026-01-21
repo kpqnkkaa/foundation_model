@@ -96,7 +96,7 @@ def main(DATA_PATH):
                     # 使用转换后的 cand_bbox 进行比较
                     if is_bbox_match(cand_bbox, current_bbox_norm):
                         # 提取数据
-                        if 'observer_expression' in cand and 'unique' in cand['observer_expression']:
+                        if cand.get('observer_expression') is not None and 'unique' in cand['observer_expression']:
                             observer_expression_unique = cand['observer_expression']['unique']
                         
                         if 'gazes' in cand and len(cand['gazes']) > 0:
@@ -198,7 +198,7 @@ def main(DATA_PATH):
                         cand_bbox = [cand_bbox['x_min'], cand_bbox['y_min'], cand_bbox['x_max'], cand_bbox['y_max']]
 
                     if is_bbox_match(cand_bbox, current_bbox_norm):
-                        if 'observer_expression' in cand and 'unique' in cand['observer_expression']:
+                        if cand.get('observer_expression') is not None and 'unique' in cand['observer_expression']:
                             observer_expression_unique = cand['observer_expression']['unique']
                         
                         if 'gazes' in cand and len(cand['gazes']) > 0:
