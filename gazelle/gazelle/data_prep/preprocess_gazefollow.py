@@ -24,6 +24,8 @@ def main(DATA_PATH):
     multiperson_ex = 0
     TRAIN_FRAMES = []
     for path, row in df.iterrows():
+        # path的是train/00000032/00032486.jpg，我们找到fusion_path+./merged_GazeFollow_test_EN_Qwen_Qwen3-VL-32B-Instruct_with_SEG.json
+        # fusion_path在args设置，默认值是/mnt/nvme1n1/lululemon/xjj/result/information_fusion
         img_path = os.path.join(DATA_PATH, path)
         img = Image.open(img_path)
         width, height = img.size
