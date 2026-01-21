@@ -35,6 +35,8 @@ class DataParallelWrapper(nn.DataParallel):
         # input_dict 是 main 函数里传进来的那个字典
         images = input_dict['images'] # Tensor [Batch, ...]
         bboxes = input_dict['bboxes'] # List [Batch, ...]
+        eyes = input_dict['eyes'] # Tensor [Batch, ...]
+        expr_ids = input_dict['expr_ids'] # Tensor [Batch, ...]
 
         # 1. 手动切分数据
         batch_size = images.shape[0]
@@ -56,6 +58,8 @@ class DataParallelWrapper(nn.DataParallel):
                 # 关键修复：显式移动 Tensor 到目标显卡
                 "images": images[start_idx:end_idx].to(target_device),
                 "bboxes": bboxes[start_idx:end_idx]
+                "eyes": eyes[start_idx:end_idx],
+                "expr_ids": observer_expressions[start_idx:end_idx],
             }
             # 关键修复：包装进 Tuple，防止解包错误
             replicas_inputs.append((replica_dict,))

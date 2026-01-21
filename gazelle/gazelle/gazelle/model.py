@@ -67,12 +67,12 @@ class GazeLLE(nn.Module):
                     nn.Sigmoid()
                 )
             if self.is_multi_output:
+                # 8分类
                 self.direction_head = nn.Sequential(
                     nn.Linear(self.dim, 128),
                     nn.ReLU(),
                     nn.Dropout(0.1),
-                    nn.Linear(128, 1),
-                    nn.Sigmoid()
+                    nn.Linear(128, 8)
                 )
                 self.expression_head = nn.Sequential(
                     nn.Linear(self.dim, 128),
