@@ -174,6 +174,9 @@ def main():
     #     {'params': scratch_params, 'lr': args.lr},
     #     {'params': finetune_params, 'lr': args.lr * 0.1}
     # ]
+    criterion_bce = nn.BCELoss() # 用于Heatmap和Seg
+    criterion_ce = nn.CrossEntropyLoss(ignore_index=-1) # 用于Direction
+    
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     # optimizer = torch.optim.AdamW(param_dicts, lr=args.lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs, eta_min=1e-7)
@@ -196,7 +199,7 @@ def main():
 
             optimizer.zero_grad()
             
-            preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "expr_ids": observer_expressions})
+            preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions， "gaze_point_expression_ids": gaze_point_expressions})
             
             if isinstance(preds['heatmap'], list):
                  heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
