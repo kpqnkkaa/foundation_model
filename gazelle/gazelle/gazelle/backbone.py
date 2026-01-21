@@ -156,13 +156,17 @@ class SAMPromptEncoder(nn.Module):
             param.requires_grad = False # 保持冻结，或者是 True 取决于你的策略
         if is_multi_input:
             self.text_encoder = GPT2Model.from_pretrained("gpt2")
+            for param in self.text_encoder.parameters():
+                param.requires_grad = False
             if is_lora:
                 peft_config = LoraConfig(
                     task_type=TaskType.FEATURE_EXTRACTION, 
-                    r=lora_r, lora_alpha=lora_r * 2, 
+                    r=lora_r, lora_alpha=lora_r, 
                     target_modules=["c_attn"], lora_dropout=0.1, bias="none"
                 )
                 self.text_encoder = get_peft_model(self.text_encoder, peft_config)
+                print("Text Encoder Trainable Parameters:")
+                self.text_encoder.print_trainable_parameters()
             self.text_proj = nn.Linear(768, 256) 
 
     def forward(self, bboxes, device, eyes=None, expr_ids=None):
