@@ -213,9 +213,12 @@ def main(DATA_PATH):
             gazex = [x * float(width) for x in row['gaze_x']]
             gazey = [y * float(height) for y in row['gaze_y']]
 
+            print(row['eye_x'][0], row['eye_y'][0])
+
             heads.append({
                 'bbox': [xmin, ymin, xmax, ymax],
                 'bbox_norm': [xmin / float(width), ymin / float(height), xmax / float(width), ymax / float(height)],
+                'eye': [row['eye_x'][0], row['eye_y'][0]],
                 'gazex': gazex,
                 'gazey': gazey,
                 'gazex_norm': gazex_norm,

@@ -4,6 +4,7 @@ import os
 import copy
 from PIL import Image
 import numpy as np
+from transformers import GPT2Tokenizer
 
 import gazelle.utils as utils
 
@@ -30,6 +31,7 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
         self.transform = transform
         self.in_frame_only = in_frame_only
         self.sample_rate = sample_rate
+        self.expr_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         
         if dataset_name == "gazefollow":
             self.data = load_data_gazefollow(os.path.join(self.path, "{}_preprocessed.json".format(split)))
@@ -58,12 +60,14 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
             observer_expression = np.random.choice(observer_expression_list)
         else:
             observer_expression = ""
+        observer_expression_ids = self.expr_tokenizer.encode(observer_expression, add_special_tokens=False)
 
         gaze_point_expressions_list = head_data.get('gaze_point_expressions')
         if gaze_point_expressions_list and isinstance(gaze_point_expressions_list, list) and len(gaze_point_expressions_list) > 0:
             gaze_point_expression = np.random.choice(gaze_point_expressions_list)
         else:
             gaze_point_expression = ""
+        gaze_point_expression_ids = self.expr_tokenizer.encode(gaze_point_expression, add_special_tokens=False)
 
         direction_map = {
             "right": 0, "top-right": 1, "above": 2, "top-left": 3,
@@ -106,9 +110,9 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
         
         if self.split == "train":
             heatmap = utils.get_heatmap(gazex_norm[0], gazey_norm[0], 64, 64) # note for training set, there is only one annotation
-            return img, bbox_norm, gazex_norm, gazey_norm, torch.tensor(inout), height, width, heatmap, observer_expression, torch.tensor(gaze_direction), gaze_point_expression, seg_mask_path
+            return img, bbox_norm, gazex_norm, gazey_norm, torch.tensor(inout), height, width, heatmap, observer_expression_ids, torch.tensor(gaze_direction), gaze_point_expression_ids, seg_mask_path
         else:
-            return img, bbox_norm, gazex_norm, gazey_norm, torch.tensor(inout), height, width, observer_expression, torch.tensor(gaze_direction), gaze_point_expression, seg_mask_path
+            return img, bbox_norm, gazex_norm, gazey_norm, torch.tensor(inout), height, width, observer_expression_ids, torch.tensor(gaze_direction), gaze_point_expression_ids, seg_mask_path
 
     def __len__(self):
         return len(self.data_idxs)
