@@ -1,4 +1,4 @@
 Traceback (most recent call last):
-  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 8, in <module>
-    import wandb
-ModuleNotFoundError: No module named 'wandb'
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 15, in <module>
+    from gazelle.dataloader import GazeDataset, collate_fn
+ModuleNotFoundError: No module named 'gazelle'
