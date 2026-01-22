@@ -178,25 +178,24 @@ class GazeLLE(nn.Module):
             
             # 1. InOut 任务
             if self.inout:
-                inout_token_out = hs[:, current_idx, :]
+                inout_token_out = src[:, current_idx, :]
                 inout_preds_flat = self.inout_head(inout_token_out).squeeze(dim=-1)
                 inout_preds = utils.split_tensors(inout_preds_flat, num_ppl_per_img)
                 current_idx += 1
             
             # 2. Heatmap Token (必须存在)
-            heatmap_token_out = hs[:, current_idx, :]
+            heatmap_token_out = src[:, current_idx, :]
             current_idx += 1
             
             # 3. Multi Output Tokens
             seg_token_out = None
             if self.is_multi_output:
-                seg_token_out = hs[:, current_idx, :]      # Seg
-                direction_token_out = hs[:, current_idx+1, :] # Dir
-                text_token_out = hs[:, current_idx+2, :] # Text
+                seg_token_out = src[:, current_idx, :]      # Seg
+                direction_token_out = src[:, current_idx+1, :] # Dir
+                text_token_out = src[:, current_idx+2, :] # Text
                 current_idx += 3 # 虽然不用了，但保持习惯
                 
                 # 计算标量输出
-                print(direction_token_out.shape)
                 dir_flat = self.direction_head(direction_token_out).squeeze(dim=-1)
                 direction_preds = utils.split_tensors(dir_flat, num_ppl_per_img)
                 text_preds = self.text_head(fusion_feat = text_token_out, target_ids = input["gaze_point_expression_ids"])
