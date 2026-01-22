@@ -236,6 +236,7 @@ def main():
                 text_loss = None
             
             if preds['seg'] is not None:
+                print(preds['seg'].shape, seg_mask.shape)
                 seg_loss = criterion_bce(preds['seg'], seg_mask)
                 loss += seg_loss
             else:

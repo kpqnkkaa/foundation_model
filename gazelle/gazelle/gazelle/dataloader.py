@@ -98,6 +98,8 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
             seg_mask = seg_mask / 255.0
         else:
             seg_mask = np.zeros((64, 64))
+        seg_mask = torch.from_numpy(seg_mask).float()
+        seg_mask = seg_mask.unsqueeze(0)
 
         img_path = os.path.join(self.path, img_data['path'])
         img = Image.open(img_path)
