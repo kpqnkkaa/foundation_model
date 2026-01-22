@@ -1,4 +1,83 @@
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/lululemon/.netrc.
+wandb: Currently logged in as: 13155272911 (514) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run rcn2b3iw
+wandb: Tracking run with wandb version 0.24.0
+wandb: Run data is saved locally in /mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/wandb/run-20260122_190948-rcn2b3iw
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run train_sam_dinov2_lora_prompt_gazefollow_multi_output_input
+wandb: ⭐️ View project at https://wandb.ai/514/sam_dinov2_vitb_lora_multi_output_input
+wandb: 🚀 View run at https://wandb.ai/514/sam_dinov2_vitb_lora_multi_output_input/runs/rcn2b3iw
+训练开始。详细日志将输出到: ./experiments/train_sam_dinov2_lora_prompt_gazefollow_multi_output_input/2026-01-22_19-09-49/log.txt
+Using cache found in /mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main
+/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:43: UserWarning: xFormers is available (SwiGLU)
+  warnings.warn("xFormers is available (SwiGLU)")
+/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:27: UserWarning: xFormers is available (Attention)
+  warnings.warn("xFormers is available (Attention)")
 Traceback (most recent call last):
-  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 15, in <module>
-    from gazelle.dataloader import GazeDataset, collate_fn
-ModuleNotFoundError: No module named 'gazelle'
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 344, in <module>
+    main()
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 149, in main
+    model, transform = get_gazelle_model(args.model)
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/gazelle/model.py", line 366, in get_gazelle_model
+    return factory[model_name]()
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/gazelle/model.py", line 426, in sam_dinov2_vitb_lora_multi_output_input
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=True)
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/gazelle/backbone.py", line 327, in __init__
+    self.img_encoder = DinoV2Backbone('dinov2_vitb14', is_lora, lora_r)
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/gazelle/backbone.py", line 38, in __init__
+    self.model = torch.hub.load('facebookresearch/dinov2', model_name)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/gazelle/lib/python3.9/site-packages/torch/hub.py", line 647, in load
+    model = _load_local(repo_or_dir, model, *args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/gazelle/lib/python3.9/site-packages/torch/hub.py", line 676, in _load_local
+    model = entry(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/hub/backbones.py", line 93, in dinov2_vitb14
+    return _make_dinov2_model(arch_name="vit_base", pretrained=pretrained, weights=weights, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/hub/backbones.py", line 49, in _make_dinov2_model
+    from ..models import vision_transformer as vits
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/models/__init__.py", line 8, in <module>
+    from . import vision_transformer as vits
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/models/vision_transformer.py", line 21, in <module>
+    from dinov2.layers import Mlp, PatchEmbed, SwiGLUFFNFused, MemEffAttention, NestedTensorBlock as Block
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/__init__.py", line 11, in <module>
+    from .block import NestedTensorBlock, CausalAttentionBlock
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py", line 18, in <module>
+    from .attention import Attention, MemEffAttention
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py", line 36, in <module>
+    class Attention(nn.Module):
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py", line 58, in Attention
+    self, init_attn_std: float | None = None, init_proj_std: float | None = None, factor: float = 1.0
+TypeError: unsupported operand type(s) for |: 'type' and 'NoneType'
+Traceback (most recent call last):
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 344, in <module>
+    main()
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 149, in main
+    model, transform = get_gazelle_model(args.model)
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/gazelle/model.py", line 366, in get_gazelle_model
+    return factory[model_name]()
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/gazelle/model.py", line 426, in sam_dinov2_vitb_lora_multi_output_input
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=True)
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/gazelle/backbone.py", line 327, in __init__
+    self.img_encoder = DinoV2Backbone('dinov2_vitb14', is_lora, lora_r)
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/gazelle/backbone.py", line 38, in __init__
+    self.model = torch.hub.load('facebookresearch/dinov2', model_name)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/gazelle/lib/python3.9/site-packages/torch/hub.py", line 647, in load
+    model = _load_local(repo_or_dir, model, *args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/gazelle/lib/python3.9/site-packages/torch/hub.py", line 676, in _load_local
+    model = entry(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/hub/backbones.py", line 93, in dinov2_vitb14
+    return _make_dinov2_model(arch_name="vit_base", pretrained=pretrained, weights=weights, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/hub/backbones.py", line 49, in _make_dinov2_model
+    from ..models import vision_transformer as vits
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/models/__init__.py", line 8, in <module>
+    from . import vision_transformer as vits
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/models/vision_transformer.py", line 21, in <module>
+    from dinov2.layers import Mlp, PatchEmbed, SwiGLUFFNFused, MemEffAttention, NestedTensorBlock as Block
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/__init__.py", line 11, in <module>
+    from .block import NestedTensorBlock, CausalAttentionBlock
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py", line 18, in <module>
+    from .attention import Attention, MemEffAttention
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py", line 36, in <module>
+    class Attention(nn.Module):
+  File "/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py", line 58, in Attention
+    self, init_attn_std: float | None = None, init_proj_std: float | None = None, factor: float = 1.0
+TypeError: unsupported operand type(s) for |: 'type' and 'NoneType'

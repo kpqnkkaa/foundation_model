@@ -14,4 +14,7 @@ dependencies:
   - scikit-learn
   - matplotlib
   - pandas
+  - peft
+  - transformers
+  - segment-anything
   
