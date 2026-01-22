@@ -72,12 +72,10 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
             gaze_point_expression = np.random.choice(gaze_point_expressions_list)
             gaze_point_encoded = self.expr_tokenizer(gaze_point_expression, max_length=25, padding="max_length", truncation=True, return_tensors="pt")
             gaze_point_expression_ids = gaze_point_encoded['input_ids'].squeeze(0)
-            gaze_point_attention_mask = gaze_point_encoded['attention_mask'].squeeze(0)
-            gaze_point_expression_ids[gaze_point_attention_mask == 0] = -100
         else:
             gaze_point_expression = ""
-            gaze_point_expression_ids = torch.full((25,), -100, dtype=torch.long)
-
+            gaze_point_expression_ids = torch.full((25,), self.expr_tokenizer.pad_token_id, dtype=torch.long)
+            
         direction_map = {
             "right": 0, "top-right": 1, "above": 2, "top-left": 3,
             "left": 4, "bottom-left": 5, "below": 6, "bottom-right": 7
