@@ -23,3 +23,44 @@ trainable params: 294,912 || all params: 124,734,720 || trainable%: 0.2364
 Found existing SAM checkpoint at /mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/checkpoints/sam_vit_b_01ec64.pth
 Loading gpt2 for text generation...
 trainable params: 294,912 || all params: 124,734,720 || trainable%: 0.2364
+Epoch 0 [Train]:   0%|          | 0/1891 [00:00<?, ?batch/s]Epoch 0 [Train]:   0%|          | 0/1891 [00:01<?, ?batch/s]
+Traceback (most recent call last):
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 344, in <module>
+    main()
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 222, in main
+    preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions, "gaze_point_expression_ids": gaze_point_expressions})
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/gazelle/model.py", line 159, in forward
+    sparse_embeddings = self.backbone.prompt_encoder(bboxes_tensor, device=x.device, eyes=eyes_tensor, expr_ids=input["observer_expression_ids"])
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/gazelle/backbone.py", line 197, in forward
+    gpt_out = self.text_encoder(expr_ids)[0] # [B, L, 768]
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/peft/peft_model.py", line 2986, in forward
+    return self.base_model(
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/peft/tuners/tuners_utils.py", line 308, in forward
+    return self.model.forward(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/transformers/models/gpt2/modeling_gpt2.py", line 855, in forward
+    inputs_embeds = self.wte(input_ids)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/sparse.py", line 192, in forward
+    return F.embedding(
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/functional.py", line 2542, in embedding
+    return torch.embedding(weight, input, padding_idx, scale_grad_by_freq, sparse)
+RuntimeError: Expected all tensors to be on the same device, but got index is on cpu, different from other tensors on cuda:0 (when checking argument in method wrapper_CUDA__index_select)
