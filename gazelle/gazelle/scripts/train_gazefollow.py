@@ -10,17 +10,17 @@ import logging
 from tqdm import tqdm
 
 # 1. 强制设置可见显卡为 2, 3
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
 
 from gazelle.dataloader import GazeDataset, collate_fn
 from gazelle.model import get_gazelle_model
 from gazelle.utils import gazefollow_auc, gazefollow_l2
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default="sam_dinov2_vitb_lora_multi_input")
+parser.add_argument('--model', type=str, default="sam_dinov2_vitb_lora_multi_input_inout")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--ckpt_save_dir', type=str, default='./experiments')
-parser.add_argument('--wandb_project', type=str, default='sam_dinov2_vitb_lora_multi_input')
+parser.add_argument('--wandb_project', type=str, default='sam_dinov2_vitb_lora_multi_input_inout')
 parser.add_argument('--exp_name', type=str, default='train_sam_dinov2_lora_prompt_gazefollow_multi_input')
 parser.add_argument('--log_iter', type=int, default=10, help='how often to log loss during training')
 parser.add_argument('--max_epochs', type=int, default=15)
@@ -234,7 +234,12 @@ def main():
                 loss += text_loss
             
             if preds['seg'] is not None:
-                seg_loss = criterion_bce(preds['seg'], seg_mask_paths.cuda())
+                # 先读取seg_mask_paths为numpy数组，不存在则返回全0的numpy数组
+                if not os.path.exists(seg_mask_paths):
+                    seg_mask = np.zeros((heatmap_preds.shape[0], heatmap_preds.shape[1]))
+                else:
+                    seg_mask = np.load(seg_mask_paths)
+                seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
                 loss += seg_loss
 
             if preds['direction'] is not None:
