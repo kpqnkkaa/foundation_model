@@ -173,7 +173,6 @@ class GazeLLE(nn.Module):
             # 注意：确保 backbone.py 中的 SAMFusion 返回顺序也是 (image, tokens)
             # print(x.shape, tokens.shape)
             hs, src = self.backbone.fusion(image_embeddings=x, tokens=tokens)
-            print(hs.shape, src.shape)
             current_idx = 0 # 使用指针，不管是否有 inout 都能对齐
             
             # 1. InOut 任务
@@ -198,6 +197,7 @@ class GazeLLE(nn.Module):
                 print(direction_token_out.shape)
                 
                 # 计算标量输出
+                print(aaa)
                 dir_flat = self.direction_head(direction_token_out).squeeze(dim=-1)
                 direction_preds = utils.split_tensors(dir_flat, num_ppl_per_img)
                 text_preds = self.text_head(fusion_feat = text_token_out, target_ids = input["gaze_point_expression_ids"])
