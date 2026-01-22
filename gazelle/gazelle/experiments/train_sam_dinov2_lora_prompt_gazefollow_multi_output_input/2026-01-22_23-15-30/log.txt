@@ -24,3 +24,15 @@
 2026-01-22 23:18:53,527 - Iter 190/1891, Loss=3.6812, Text Loss=1.9698, Seg Loss=0.2522, Direction Loss=1.3897, Loss=3.6812
 2026-01-22 23:19:03,234 - Iter 200/1891, Loss=3.5041, Text Loss=1.8837, Seg Loss=0.1565, Direction Loss=1.3932, Loss=3.5041
 2026-01-22 23:19:12,875 - Iter 210/1891, Loss=3.9284, Text Loss=2.0961, Seg Loss=0.1600, Direction Loss=1.6025, Loss=3.9284
+2026-01-22 23:19:22,584 - Iter 220/1891, Loss=3.3984, Text Loss=1.8353, Seg Loss=0.1555, Direction Loss=1.3373, Loss=3.3984
+2026-01-22 23:19:32,433 - Iter 230/1891, Loss=3.5829, Text Loss=1.8248, Seg Loss=0.1153, Direction Loss=1.5732, Loss=3.5829
+2026-01-22 23:19:42,170 - Iter 240/1891, Loss=3.5953, Text Loss=1.8085, Seg Loss=0.1853, Direction Loss=1.5314, Loss=3.5953
+2026-01-22 23:19:51,913 - Iter 250/1891, Loss=3.6106, Text Loss=1.8963, Seg Loss=0.1999, Direction Loss=1.4423, Loss=3.6106
+2026-01-22 23:20:01,670 - Iter 260/1891, Loss=3.3870, Text Loss=1.7340, Seg Loss=0.2077, Direction Loss=1.3748, Loss=3.3870
+2026-01-22 23:20:11,589 - Iter 270/1891, Loss=3.7589, Text Loss=1.9501, Seg Loss=0.1973, Direction Loss=1.5412, Loss=3.7589
+2026-01-22 23:20:21,468 - Iter 280/1891, Loss=3.5511, Text Loss=1.9248, Seg Loss=0.1619, Direction Loss=1.3938, Loss=3.5511
+2026-01-22 23:20:31,338 - Iter 290/1891, Loss=3.1767, Text Loss=1.7967, Seg Loss=0.1730, Direction Loss=1.1367, Loss=3.1767
+2026-01-22 23:20:41,119 - Iter 300/1891, Loss=3.1908, Text Loss=1.7261, Seg Loss=0.1640, Direction Loss=1.2307, Loss=3.1908
+2026-01-22 23:20:50,981 - Iter 310/1891, Loss=3.6795, Text Loss=1.9634, Seg Loss=0.2219, Direction Loss=1.4218, Loss=3.6795
+2026-01-22 23:21:00,686 - Iter 320/1891, Loss=3.3526, Text Loss=1.8263, Seg Loss=0.1870, Direction Loss=1.2714, Loss=3.3526
+2026-01-22 23:21:10,305 - Iter 330/1891, Loss=3.3749, Text Loss=1.7978, Seg Loss=0.1343, Direction Loss=1.3721, Loss=3.3749
