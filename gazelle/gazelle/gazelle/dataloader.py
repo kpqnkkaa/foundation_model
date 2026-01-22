@@ -7,6 +7,7 @@ import copy
 from PIL import Image
 import numpy as np
 from transformers import GPT2Tokenizer
+import cv2
 import gazelle.utils as utils
 
 def load_data_vat(file, sample_rate):
@@ -90,8 +91,13 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
             gaze_direction = -1
         
         seg_mask_path = head_data.get('seg_mask_path')
-        if seg_mask_path is None:
-            seg_mask_path = ""
+        # 判断是否存在，存在则加载
+        if seg_mask_path is not None and os.path.exists(seg_mask_path):
+            seg_mask = cv2.imread(seg_mask_path, 0)
+            seg_mask = cv2.resize(seg_mask, (64, 64))
+            seg_mask = seg_mask / 255.0
+        else:
+            seg_mask = np.zeros((64, 64))
 
         img_path = os.path.join(self.path, img_data['path'])
         img = Image.open(img_path)
@@ -120,9 +126,9 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
         
         if self.split == "train":
             heatmap = utils.get_heatmap(gazex_norm[0], gazey_norm[0], 64, 64) # note for training set, there is only one annotation
-            return img, bbox_norm, eye_norm, gazex_norm, gazey_norm, torch.tensor(inout), height, width, heatmap, observer_expression_ids, torch.tensor(gaze_direction), gaze_point_expression_ids, seg_mask_path
+            return img, bbox_norm, eye_norm, gazex_norm, gazey_norm, torch.tensor(inout), height, width, heatmap, observer_expression_ids, torch.tensor(gaze_direction), gaze_point_expression_ids, seg_mask
         else:
-            return img, bbox_norm, eye_norm, gazex_norm, gazey_norm, torch.tensor(inout), height, width, observer_expression_ids, torch.tensor(gaze_direction), gaze_point_expression_ids, seg_mask_path
+            return img, bbox_norm, eye_norm, gazex_norm, gazey_norm, torch.tensor(inout), height, width, observer_expression_ids, torch.tensor(gaze_direction), gaze_point_expression_ids, seg_mask
 
     def __len__(self):
         return len(self.data_idxs)

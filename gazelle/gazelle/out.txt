@@ -1,13 +1,13 @@
 wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/lululemon/.netrc.
 wandb: Currently logged in as: 13155272911 (514) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
-wandb: setting up run d0pmsskb
+wandb: setting up run yxkzmb2g
 wandb: Tracking run with wandb version 0.24.0
-wandb: Run data is saved locally in /mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/wandb/run-20260122_223350-d0pmsskb
+wandb: Run data is saved locally in /mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/wandb/run-20260122_224514-yxkzmb2g
 wandb: Run `wandb offline` to turn off syncing.
 wandb: Syncing run train_sam_dinov2_lora_prompt_gazefollow_multi_output_input
 wandb: ⭐️ View project at https://wandb.ai/514/sam_dinov2_vitb_lora_multi_output_input
-wandb: 🚀 View run at https://wandb.ai/514/sam_dinov2_vitb_lora_multi_output_input/runs/d0pmsskb
-训练开始。详细日志将输出到: ./experiments/train_sam_dinov2_lora_prompt_gazefollow_multi_output_input/2026-01-22_22-33-51/log.txt
+wandb: 🚀 View run at https://wandb.ai/514/sam_dinov2_vitb_lora_multi_output_input/runs/yxkzmb2g
+训练开始。详细日志将输出到: ./experiments/train_sam_dinov2_lora_prompt_gazefollow_multi_output_input/2026-01-22_22-45-16/log.txt
 Using cache found in /mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main
 /mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:43: UserWarning: xFormers is available (SwiGLU)
   warnings.warn("xFormers is available (SwiGLU)")
@@ -24,12 +24,18 @@ Found existing SAM checkpoint at /mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/che
 Loading gpt2 for text generation...
 trainable params: 294,912 || all params: 124,734,720 || trainable%: 0.2364
 Epoch 0 [Train]:   0%|          | 0/1891 [00:00<?, ?batch/s]`loss_type=None` was set in the config but it is unrecognized. Using the default loss: `ForCausalLMLoss`.
-Epoch 0 [Train]:   0%|          | 0/1891 [00:01<?, ?batch/s]
+Epoch 0 [Train]:   0%|          | 0/1891 [00:02<?, ?batch/s]
 Traceback (most recent call last):
-  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 344, in <module>
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 339, in <module>
     main()
-  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 240, in main
-    if not os.path.exists(seg_mask_paths):
-  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/genericpath.py", line 19, in exists
-    os.stat(path)
-TypeError: stat: path should be string, bytes, os.PathLike or integer, not list
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 239, in main
+    seg_loss = criterion_bce(preds['seg'], seg_mask)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/modules/loss.py", line 727, in forward
+    return F.binary_cross_entropy(
+  File "/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/torch/nn/functional.py", line 3516, in binary_cross_entropy
+    if target.size() != input.size():
+AttributeError: 'list' object has no attribute 'size'

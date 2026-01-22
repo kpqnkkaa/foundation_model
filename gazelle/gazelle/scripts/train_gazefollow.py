@@ -214,7 +214,7 @@ def main():
         epoch_losses = []
         
         for cur_iter, batch in pbar:
-            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = batch
+            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask = batch
 
             optimizer.zero_grad()
             
@@ -236,12 +236,7 @@ def main():
                 text_loss = None
             
             if preds['seg'] is not None:
-                # 先读取seg_mask_paths为numpy数组，不存在则返回全0的numpy数组
-                if not os.path.exists(seg_mask_paths):
-                    seg_mask = np.zeros((heatmap_preds.shape[0], heatmap_preds.shape[1]))
-                else:
-                    seg_mask = np.load(seg_mask_paths)
-                seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
+                seg_loss = criterion_bce(preds['seg'], seg_mask)
                 loss += seg_loss
             else:
                 seg_loss = None
@@ -293,7 +288,7 @@ def main():
                          desc=f"Epoch {epoch} [Eval]", unit="batch", dynamic_ncols=True)
         
         for cur_iter, batch in eval_pbar:
-            imgs, bboxes, eyes,gazex, gazey, inout, heights, widths, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = batch
+            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask = batch
 
             with torch.no_grad():
                 preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions})
