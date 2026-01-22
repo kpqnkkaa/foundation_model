@@ -8,3 +8,26 @@ wandb: Syncing run train_sam_dinov2_lora_prompt_gazefollow_multi_output_input
 wandb: ⭐️ View project at https://wandb.ai/514/sam_dinov2_vitb_lora_multi_output_input
 wandb: 🚀 View run at https://wandb.ai/514/sam_dinov2_vitb_lora_multi_output_input/runs/0gpvdb1h
 训练开始。详细日志将输出到: ./experiments/train_sam_dinov2_lora_prompt_gazefollow_multi_output_input/2026-01-22_22-55-59/log.txt
+Using cache found in /mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main
+/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:43: UserWarning: xFormers is available (SwiGLU)
+  warnings.warn("xFormers is available (SwiGLU)")
+/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:27: UserWarning: xFormers is available (Attention)
+  warnings.warn("xFormers is available (Attention)")
+/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:33: UserWarning: xFormers is available (Block)
+  warnings.warn("xFormers is available (Block)")
+trainable params: 294,912 || all params: 86,875,392 || trainable%: 0.3395
+Found existing SAM checkpoint at /mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/checkpoints/sam_vit_b_01ec64.pth
+/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/peft/tuners/lora/layer.py:2285: UserWarning: fan_in_fan_out is set to False but the target module is `Conv1D`. Setting fan_in_fan_out to True.
+  warnings.warn(
+trainable params: 294,912 || all params: 124,734,720 || trainable%: 0.2364
+Found existing SAM checkpoint at /mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/checkpoints/sam_vit_b_01ec64.pth
+Loading gpt2 for text generation...
+trainable params: 294,912 || all params: 124,734,720 || trainable%: 0.2364
+Epoch 0 [Train]:   0%|          | 0/1891 [00:00<?, ?batch/s]`loss_type=None` was set in the config but it is unrecognized. Using the default loss: `ForCausalLMLoss`.
+Epoch 0 [Train]:   0%|          | 0/1891 [00:02<?, ?batch/s]
+Traceback (most recent call last):
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 340, in <module>
+    main()
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 239, in main
+    print(preds['seg'].shape, seg_mask.shape)
+AttributeError: 'list' object has no attribute 'shape'
