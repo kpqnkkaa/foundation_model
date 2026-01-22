@@ -224,6 +224,7 @@ class GazeTextDecoder(nn.Module):
         )
         self.gpt2 = get_peft_model(self.gpt2, peft_config)
         self.gpt2.print_trainable_parameters() # 打印一下参数量
+        self.gpt2.config.pad_token_id = self.gpt2.config.eos_token_id
 
         # 4. 投影层: 把 GazeLLE 的特征 (256) 映射到 GPT2 的 embedding (768)
         self.visual_proj = nn.Linear(input_dim, self.gpt2.config.n_embd)
@@ -249,11 +250,11 @@ class GazeTextDecoder(nn.Module):
             
             # 构造 Labels
             labels = target_ids.clone()
-            is_empty_text = (target_ids == self.gpt2.config.pad_token_id).all(dim=1)
+            is_empty_text = (labels == self.gpt2.config.pad_token_id).all(dim=1)
             labels[is_empty_text] = -100
             
-            dummy_label = torch.full((target_ids.shape[0], 1), -100, device=target_ids.device, dtype=torch.long)
-            labels = torch.cat([dummy_label, target_ids], dim=1)
+            dummy_label = torch.full((labels.shape[0], 1), -100, device=labels.device, dtype=torch.long)
+            labels = torch.cat([dummy_label, labels], dim=1)
 
             # Forward 计算 Loss
             # GPT2 内部会自动计算 Shift Logits 和 Loss

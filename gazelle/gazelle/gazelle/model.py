@@ -6,6 +6,7 @@ import math
 import os
 from gazelle.backbone import DinoV2Backbone, SAMBackboneWrapper, SAMImageEncoder, GazeTextDecoder
 import gazelle.utils as utils
+import torch.nn.functional as F
 
 class GazeLLE(nn.Module):
     def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64), is_multi_output=False):
