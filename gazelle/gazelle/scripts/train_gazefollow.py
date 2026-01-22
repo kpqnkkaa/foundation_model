@@ -217,7 +217,7 @@ def main():
             imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = batch
 
             optimizer.zero_grad()
-            '
+            
             # gaze_point_expression_ids用于计算 Text Generation Loss (仅训练时需要)
             preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions, "gaze_point_expression_ids": gaze_point_expressions})
             
