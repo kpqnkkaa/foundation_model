@@ -1,27 +1,4 @@
-wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/lululemon/.netrc.
-wandb: Currently logged in as: 13155272911 (514) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
-wandb: setting up run fki8ziez
-wandb: Tracking run with wandb version 0.24.0
-wandb: Run data is saved locally in /mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/wandb/run-20260122_164515-fki8ziez
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run train_sam_dinov2_lora_prompt_gazefollow_multi_output_input
-wandb: ⭐️ View project at https://wandb.ai/514/sam_dinov2_vitb_lora_multi_output_input
-wandb: 🚀 View run at https://wandb.ai/514/sam_dinov2_vitb_lora_multi_output_input/runs/fki8ziez
-Using cache found in /mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main
-/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/swiglu_ffn.py:43: UserWarning: xFormers is available (SwiGLU)
-  warnings.warn("xFormers is available (SwiGLU)")
-/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/attention.py:27: UserWarning: xFormers is available (Attention)
-  warnings.warn("xFormers is available (Attention)")
-/mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/facebookresearch_dinov2_main/dinov2/layers/block.py:33: UserWarning: xFormers is available (Block)
-  warnings.warn("xFormers is available (Block)")
-/mnt/nvme1n1/lululemon/xjj/miniconda3/envs/fm_shijing/lib/python3.10/site-packages/peft/tuners/lora/layer.py:2285: UserWarning: fan_in_fan_out is set to False but the target module is `Conv1D`. Setting fan_in_fan_out to True.
-  warnings.warn(
-训练开始。详细日志将输出到: ./experiments/train_sam_dinov2_lora_prompt_gazefollow_multi_output_input/2026-01-22_16-45-16/log.txt
-trainable params: 294,912 || all params: 86,875,392 || trainable%: 0.3395
-Found existing SAM checkpoint at /mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/checkpoints/sam_vit_b_01ec64.pth
-trainable params: 294,912 || all params: 124,734,720 || trainable%: 0.2364
-Found existing SAM checkpoint at /mnt/nvme1n1/lululemon/xjj/.cache/torch/hub/checkpoints/sam_vit_b_01ec64.pth
-Loading gpt2 for text generation...
-trainable params: 294,912 || all params: 124,734,720 || trainable%: 0.2364
-Detected 2 GPUs. Using DataParallelWrapper.
-Epoch 0 [Train]:   0%|          | 0/1891 [00:00<?, ?batch/s]
+Traceback (most recent call last):
+  File "/mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/scripts/train_gazefollow.py", line 8, in <module>
+    import wandb
+ModuleNotFoundError: No module named 'wandb'

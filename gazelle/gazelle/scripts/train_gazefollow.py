@@ -10,7 +10,7 @@ import logging
 from tqdm import tqdm
 
 # 1. 强制设置可见显卡为 2, 3
-os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 from gazelle.dataloader import GazeDataset, collate_fn
 from gazelle.model import get_gazelle_model
