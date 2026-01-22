@@ -127,7 +127,7 @@ class GazeLLE(nn.Module):
         #              SAM 逻辑分支
         # ==========================================
         if self.is_sam:
-            print(input["gaze_point_expression_ids"])
+            # print(input["gaze_point_expression_ids"])
             # 将 Batch 维度展开为 Total_People 维度
             # x becomes: [Total_People, dim, H, W]
             x = utils.repeat_tensors(x, num_ppl_per_img)
@@ -169,6 +169,7 @@ class GazeLLE(nn.Module):
             # src: 更新后的图像特征 [Total_People, dim, H, W]
             # hs:  更新后的 Tokens [Total_People, N_total, dim]
             # 注意：确保 backbone.py 中的 SAMFusion 返回顺序也是 (image, tokens)
+            print(x.shape, tokens.shape)
             src, hs = self.backbone.fusion(image_embeddings=x, tokens=tokens)
             
             current_idx = 0 # 使用指针，不管是否有 inout 都能对齐
