@@ -236,13 +236,20 @@ def main():
                 text_loss = None
             
             if preds['seg'] is not None:
-                print(preds['seg'].shape, seg_mask.shape)
-                seg_loss = criterion_bce(preds['seg'], seg_mask)
+                if isinstance(preds['seg'], list):
+                    preds['seg'] = torch.stack(preds['seg']).squeeze(dim=1)
+                else:
+                    preds['seg'] = preds['seg'].squeeze(dim=1)
+                seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
                 loss += seg_loss
             else:
                 seg_loss = None
 
             if preds['direction'] is not None:
+                if isinstance(preds['direction'], list):
+                    preds['direction'] = torch.stack(preds['direction']).squeeze(dim=1)
+                else:
+                    preds['direction'] = preds['direction'].squeeze(dim=1)
                 direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
                 loss += direction_loss
             else:
@@ -256,11 +263,11 @@ def main():
             if text_loss is not None:
                 pbar.set_postfix({'heatmap_loss': f"{heatmap_loss.item():.4f}", 'text_loss': f"{text_loss.item():.4f}", 'seg_loss': f"{seg_loss.item():.4f}", 'direction_loss': f"{direction_loss.item():.4f}", 'loss': f"{loss.item():.4f}"})
             else:
-                pbar.set_postfix({'loss': f"{heatmap_loss.item():.4f}"})
+                pbar.set_postfix({'loss': f"{loss.item():.4f}"})
 
             if cur_iter % args.log_iter == 0:
                 if text_loss is not None:
-                    wandb.log({"train/heatmap_loss": heatmap_lossl.item(), "train/text_loss": text_loss.item(), "train/seg_loss": seg_loss.item(), "train/direction_loss": direction_loss.item(), "train/loss": loss.item()})
+                    wandb.log({"train/heatmap_loss": heatmap_loss.item(), "train/text_loss": text_loss.item(), "train/seg_loss": seg_loss.item(), "train/direction_loss": direction_loss.item(), "train/loss": loss.item()})
                     logger.info(f"Iter {cur_iter}/{len(train_dl)}, Loss={heatmap_loss.item():.4f}, Text Loss={text_loss.item():.4f}, Seg Loss={seg_loss.item():.4f}, Direction Loss={direction_loss.item():.4f}, Loss={loss.item():.4f}")
                 else:
                     wandb.log({"train/heatmap_loss": heatmap_loss.item(), "train/loss": loss.item()})
