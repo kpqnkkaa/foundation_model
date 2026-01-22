@@ -143,12 +143,11 @@ class GazeLLE(nn.Module):
                         ymax * self.in_size[0]
                     ])
             flat_eyes = []
-            for eye_list in input["eyes"]:
-                for eye in eye_list:
-                    flat_eyes.append([
-                        eye[0] * self.in_size[1],
-                        eye[1] * self.in_size[0]
-                    ])
+            for eye in input["eyes"]:
+                flat_eyes.append([
+                    eye[0] * self.in_size[1],
+                    eye[1] * self.in_size[0]
+                ])
             # [Total_People, 4]
             bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
             eyes_tensor = torch.tensor(flat_eyes, device=x.device, dtype=torch.float32)
