@@ -25,7 +25,6 @@ class GazeLLE(nn.Module):
         # 1. 判定是否为 SAM Backbone
         # 依赖于 backbone.py 中的定义，或者 getattr 检查
         self.is_sam = getattr(backbone, 'is_sam', False)
-        print(self.is_sam)
 
         # 2. 基础组件 (所有模式共用)
         # 将 Backbone 特征 (如 DINOv2 的 768) 投影到模型维度 (256)
@@ -134,7 +133,6 @@ class GazeLLE(nn.Module):
             x = utils.repeat_tensors(x, num_ppl_per_img)
             # A. 准备 Prompts (将归一化 bbox 转为绝对坐标)
             flat_bboxes = []
-            flat_eyes = []
             for bbox_list in input["bboxes"]:
                 for bbox in bbox_list:
                     xmin, ymin, xmax, ymax = bbox
@@ -144,9 +142,12 @@ class GazeLLE(nn.Module):
                         xmax * self.in_size[1], 
                         ymax * self.in_size[0]
                     ])
+            flat_eyes = []
+            for eye_list in input["eyes"]:
+                for eye in eye_list:
                     flat_eyes.append([
-                        eye_x * self.in_size[1],
-                        eye_y * self.in_size[0]
+                        eye[0] * self.in_size[1],
+                        eye[1] * self.in_size[0]
                     ])
             # [Total_People, 4]
             bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
@@ -197,7 +198,6 @@ class GazeLLE(nn.Module):
                 direction_preds = utils.split_tensors(dir_flat, num_ppl_per_img)
                 text_preds = self.text_head(fusion_feat = text_token_out, target_ids = input["gaze_point_expression_ids"])
 
-                print(text_preds)
             # F. 生成 Heatmap (Hypernetwork + Dot Product)
             
             # 1. 上采样图像特征 -> [Total_People, 32, H*4, W*4]
