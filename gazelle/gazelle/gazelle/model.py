@@ -173,7 +173,7 @@ class GazeLLE(nn.Module):
             # 注意：确保 backbone.py 中的 SAMFusion 返回顺序也是 (image, tokens)
             # print(x.shape, tokens.shape)
             hs, src = self.backbone.fusion(image_embeddings=x, tokens=tokens)
-
+            print(hs.shape, src.shape)
             current_idx = 0 # 使用指针，不管是否有 inout 都能对齐
             
             # 1. InOut 任务
