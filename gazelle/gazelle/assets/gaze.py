@@ -174,8 +174,6 @@ class GazeLLE(nn.Module):
             # print(x.shape, tokens.shape)
             src, hs = self.backbone.fusion(image_embeddings=x, tokens=tokens)
             
-            print(src.shape, hs.shape)
-
             current_idx = 0 # 使用指针，不管是否有 inout 都能对齐
             
             # 1. InOut 任务
