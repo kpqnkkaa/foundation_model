@@ -248,12 +248,13 @@ class GazeTextDecoder(nn.Module):
             inputs_embeds = torch.cat([visual_embeds, text_embeds], dim=1)
             
             # 构造 Labels
-            # 我们希望模型根据 visual 预测 text。
-            # Visual 部分的 label 设为 -100 (PyTorch CrossEntropy 忽略)
-            # Text 部分的 label 就是 target_ids
+            labels = target_ids.clone()
+            is_empty_text = (target_ids == self.gpt2.config.pad_token_id).all(dim=1)
+            labels[is_empty_text] = -100
+            
             dummy_label = torch.full((target_ids.shape[0], 1), -100, device=target_ids.device, dtype=torch.long)
             labels = torch.cat([dummy_label, target_ids], dim=1)
-            
+
             # Forward 计算 Loss
             # GPT2 内部会自动计算 Shift Logits 和 Loss
             outputs = self.gpt2(inputs_embeds=inputs_embeds, labels=labels, attention_mask=None)
