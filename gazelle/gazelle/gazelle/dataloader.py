@@ -61,21 +61,22 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
         observer_expression_list = head_data.get('observer_expression')
         if observer_expression_list and isinstance(observer_expression_list, list) and len(observer_expression_list) > 0:
             observer_expression = np.random.choice(observer_expression_list)
+            observer_encoded = self.expr_tokenizer(observer_expression, max_length=25, padding="max_length", truncation=True, return_tensors="pt")
+            observer_expression_ids = observer_encoded['input_ids'].squeeze(0)
         else:
             observer_expression = ""
-        observer_encoded = self.expr_tokenizer(observer_expression, max_length=25, padding="max_length", truncation=True, return_tensors="pt")
-        observer_expression_ids = observer_encoded['input_ids'].squeeze(0)
+            observer_expression_ids = torch.full((25,), self.expr_tokenizer.pad_token_id, dtype=torch.long)
 
         gaze_point_expressions_list = head_data.get('gaze_point_expressions')
         if gaze_point_expressions_list and isinstance(gaze_point_expressions_list, list) and len(gaze_point_expressions_list) > 0:
             gaze_point_expression = np.random.choice(gaze_point_expressions_list)
+            gaze_point_encoded = self.expr_tokenizer(gaze_point_expression, max_length=25, padding="max_length", truncation=True, return_tensors="pt")
+            gaze_point_expression_ids = gaze_point_encoded['input_ids'].squeeze(0)
+            gaze_point_attention_mask = gaze_point_encoded['attention_mask'].squeeze(0)
+            gaze_point_expression_ids[gaze_point_attention_mask == 0] = -100
         else:
             gaze_point_expression = ""
-        gaze_point_encoded = self.expr_tokenizer(gaze_point_expression, max_length=25, padding="max_length", truncation=True, return_tensors="pt")
-        gaze_point_expression_ids = gaze_point_encoded['input_ids'].squeeze(0)
-        gaze_point_attention_mask = gaze_point_encoded['attention_mask'].squeeze(0)
-        gaze_point_expression_ids[gaze_point_attention_mask == 0] = -100
-
+            gaze_point_expression_ids = torch.full((25,), -100, dtype=torch.long)
 
         direction_map = {
             "right": 0, "top-right": 1, "above": 2, "top-left": 3,

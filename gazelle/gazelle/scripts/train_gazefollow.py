@@ -232,6 +232,8 @@ def main():
             if preds['text_loss'] is not None:
                 text_loss = preds['text_loss']
                 loss += text_loss
+            else:
+                text_loss = None
             
             if preds['seg'] is not None:
                 # 先读取seg_mask_paths为numpy数组，不存在则返回全0的numpy数组
@@ -241,10 +243,14 @@ def main():
                     seg_mask = np.load(seg_mask_paths)
                 seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
                 loss += seg_loss
+            else:
+                seg_loss = None
 
             if preds['direction'] is not None:
                 direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
                 loss += direction_loss
+            else:
+                direction_loss = None
 
             loss.backward()
             optimizer.step()

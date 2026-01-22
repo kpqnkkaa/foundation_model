@@ -357,8 +357,7 @@ def get_gazelle_model(model_name):
         "sam_dinov2_vitb": sam_dinov2_vitb,
         "sam_dinov2_vitb_lora": sam_dinov2_vitb_lora,
         "sam_sam_vitb_lora": sam_sam_vitb_lora,
-        "sam_dinov2_vitb_lora_multi_input": sam_dinov2_vitb_lora_multi_input,
-        "sam_dinov2_vitb_lora_multi_input_inout": sam_dinov2_vitb_lora_multi_input_inout,
+        "sam_dinov2_vitb_lora_multi_output_input": sam_dinov2_vitb_lora_multi_output_input
     }
     assert model_name in factory.keys(), "invalid model name"
     return factory[model_name]()
@@ -420,8 +419,8 @@ def sam_dinov2_vitb_lora_multi_input():
     model = GazeLLE(backbone, inout=False)
     return model, transform
     
-def sam_dinov2_vitb_lora_multi_input_inout():
+def sam_dinov2_vitb_lora_multi_output_input():
     backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=True)
     transform = backbone.get_transform((448, 448))
-    model = GazeLLE(backbone, inout=True, is_multi_output=True)
+    model = GazeLLE(backbone, inout=False, is_multi_output=True)
     return model, transform
