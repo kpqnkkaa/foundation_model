@@ -319,6 +319,7 @@ class SAMBackboneWrapper(Backbone):
         super().__init__()
         self.model_type = model_type
         self.in_size = in_size
+        self.is_sam = True
         
         # 实例化三个组件
         if backbone_type == "dinov2":

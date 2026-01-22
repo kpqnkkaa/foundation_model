@@ -21,10 +21,11 @@ class GazeLLE(nn.Module):
         self.in_size = in_size
         self.out_size = out_size
         self.inout = inout
-        
+
         # 1. 判定是否为 SAM Backbone
         # 依赖于 backbone.py 中的定义，或者 getattr 检查
         self.is_sam = getattr(backbone, 'is_sam', False)
+        print(self.is_sam)
 
         # 2. 基础组件 (所有模式共用)
         # 将 Backbone 特征 (如 DINOv2 的 768) 投影到模型维度 (256)
@@ -127,6 +128,7 @@ class GazeLLE(nn.Module):
         #              SAM 逻辑分支
         # ==========================================
         if self.is_sam:
+            print(input["gaze_point_expression_ids"])
             # 将 Batch 维度展开为 Total_People 维度
             # x becomes: [Total_People, dim, H, W]
             x = utils.repeat_tensors(x, num_ppl_per_img)
@@ -195,6 +197,7 @@ class GazeLLE(nn.Module):
                 direction_preds = utils.split_tensors(dir_flat, num_ppl_per_img)
                 text_preds = self.text_head(fusion_feat = text_token_out, target_ids = input["gaze_point_expression_ids"])
 
+                print(text_preds)
             # F. 生成 Heatmap (Hypernetwork + Dot Product)
             
             # 1. 上采样图像特征 -> [Total_People, 32, H*4, W*4]
