@@ -196,6 +196,7 @@ class GazeLLE(nn.Module):
                 current_idx += 3 # 虽然不用了，但保持习惯
                 
                 # 计算标量输出
+                print(direction_token_out.shape)
                 dir_flat = self.direction_head(direction_token_out).squeeze(dim=-1)
                 direction_preds = utils.split_tensors(dir_flat, num_ppl_per_img)
                 text_preds = self.text_head(fusion_feat = text_token_out, target_ids = input["gaze_point_expression_ids"])
