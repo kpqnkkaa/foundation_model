@@ -1,10 +1,10 @@
 wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/lululemon/.netrc.
 wandb: Currently logged in as: 13155272911 (514) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
-wandb: setting up run ttuk3x1p
+wandb: setting up run 0wndcw6t
 wandb: Tracking run with wandb version 0.24.0
-wandb: Run data is saved locally in /mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/wandb/run-20260122_212635-ttuk3x1p
+wandb: Run data is saved locally in /mnt/nvme1n1/lululemon/fm_shijing/gazelle/gazelle/wandb/run-20260122_221203-0wndcw6t
 wandb: Run `wandb offline` to turn off syncing.
 wandb: Syncing run train_sam_dinov2_lora_prompt_gazefollow_multi_output_input
 wandb: ⭐️ View project at https://wandb.ai/514/sam_dinov2_vitb_lora_multi_output_input
-wandb: 🚀 View run at https://wandb.ai/514/sam_dinov2_vitb_lora_multi_output_input/runs/ttuk3x1p
-训练开始。详细日志将输出到: ./experiments/train_sam_dinov2_lora_prompt_gazefollow_multi_output_input/2026-01-22_21-26-37/log.txt
+wandb: 🚀 View run at https://wandb.ai/514/sam_dinov2_vitb_lora_multi_output_input/runs/0wndcw6t
+训练开始。详细日志将输出到: ./experiments/train_sam_dinov2_lora_prompt_gazefollow_multi_output_input/2026-01-22_22-12-04/log.txt
