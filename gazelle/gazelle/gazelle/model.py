@@ -172,9 +172,7 @@ class GazeLLE(nn.Module):
             # hs:  更新后的 Tokens [Total_People, N_total, dim]
             # 注意：确保 backbone.py 中的 SAMFusion 返回顺序也是 (image, tokens)
             # print(x.shape, tokens.shape)
-            src, hs = self.backbone.fusion(image_embeddings=x, tokens=tokens)
-            
-            print(src.shape, hs.shape)
+            hs, src = self.backbone.fusion(image_embeddings=x, tokens=tokens)
 
             current_idx = 0 # 使用指针，不管是否有 inout 都能对齐
             
@@ -188,7 +186,7 @@ class GazeLLE(nn.Module):
             # 2. Heatmap Token (必须存在)
             heatmap_token_out = hs[:, current_idx, :]
             current_idx += 1
-            
+      
             # 3. Multi Output Tokens
             seg_token_out = None
             if self.is_multi_output:
@@ -197,7 +195,7 @@ class GazeLLE(nn.Module):
                 text_token_out = hs[:, current_idx+2, :] # Text
                 current_idx += 3 # 虽然不用了，但保持习惯
 
-                print(src.shape, direction_token_out.shape)
+                print(direction_token_out.shape)
                 
                 # 计算标量输出
                 dir_flat = self.direction_head(direction_token_out).squeeze(dim=-1)
