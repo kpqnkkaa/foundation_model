@@ -214,8 +214,8 @@ class GazeLLE(nn.Module):
             # heatmap = torch.sigmoid(heatmap).squeeze(1)
             # heatmap_preds = utils.split_tensors(heatmap, num_ppl_per_img)
             
-            heatmap = self.heatmap_head(heatmap_token_out)  # [Total_People, 1, H, W]   
-            heatmap_preds = torch.transforms.functional.resize(heatmap, self.out_size)
+            heatmap = self.heatmap_head(src)  # [Total_People, 1, H, W]   
+            heatmap_preds = F.interpolate(heatmap, size=self.out_size, mode='bilinear', align_corners=False)
             heatmap_preds = heatmap_preds.squeeze(1)
             heatmap_preds = utils.split_tensors(heatmap_preds, num_ppl_per_img)
 
