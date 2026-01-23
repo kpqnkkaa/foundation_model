@@ -398,9 +398,6 @@ def gazelle_sam_vitb():
     return model, transform
 
 def sam_dinov2_vitb():
-    # 自动获取路径，不存在则下载
-    checkpoint = get_sam_checkpoint_path("vit_b")
-    
     backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=False, is_multi_input=False)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
