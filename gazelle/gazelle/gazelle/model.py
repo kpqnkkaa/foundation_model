@@ -50,7 +50,7 @@ class GazeLLE(nn.Module):
             # 负责将融合后的图像特征 (256维) 上采样并降维到 32维
             # 这里的 32维 必须与 SAM 预训练 MLP 输出的权重维度一致
             self.output_upscaling = self.backbone.fusion.output_upscaling
-            
+
             # 注意：这里不再初始化 MLP，因为我们会直接使用 backbone.fusion 里的预训练 MLP
 
             # InOut 分类头 (如果需要)
@@ -353,6 +353,7 @@ def get_gazelle_model(model_name):
         "gazelle_dinov2_vitl14_inout": gazelle_dinov2_vitl14_inout,
         # 新增sam模型
         "gazelle_sam_vitb": gazelle_sam_vitb,
+        "sam_sam_vitb": sam_sam_vitb,
         "sam_dinov2_vitb": sam_dinov2_vitb,
         "sam_dinov2_vitb_lora": sam_dinov2_vitb_lora,
         "sam_sam_vitb_lora": sam_sam_vitb_lora,
@@ -406,6 +407,12 @@ def sam_dinov2_vitb_lora():
 
 def sam_sam_vitb_lora():
     backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=True, is_multi_input=False)
+    transform = backbone.get_transform((448, 448))
+    model = GazeLLE(backbone, inout=False)
+    return model, transform
+
+def sam_sam_vitb():
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=False, is_multi_input=False)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
     return model, transform

@@ -332,8 +332,8 @@ class SAMBackboneWrapper(Backbone):
                 self.img_encoder = DinoV2Backbone('dinov2_vitl14', is_lora, lora_r)
         elif backbone_type == "sam":
             self.img_encoder = SAMImageEncoder(model_type, is_lora, lora_r, in_size[0])
-            self.prompt_encoder = SAMPromptEncoder(model_type, is_multi_input, is_lora, lora_r)
-            self.fusion = SAMFusion(model_type)
+        self.prompt_encoder = SAMPromptEncoder(model_type, is_multi_input, is_lora, lora_r)
+        self.fusion = SAMFusion(model_type)
         
     def forward(self, x):
         # 仅用于兼容 Backbone 接口，实际逻辑在 model.py 中显式调用各个组件
