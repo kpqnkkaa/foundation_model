@@ -1,0 +1,17 @@
+2026-01-23 00:20:48,856 - Experiment Config: {'model': 'sam_dinov2_vitb_lora', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'ckpt_save_dir': './experiments', 'wandb_project': 'sam_dinov2_vitb_lora_multi_input', 'exp_name': 'train_sam_dinov2_lora_prompt_gazefollow_multi_input', 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
+2026-01-23 00:23:02,950 - Learnable parameters: 4940640
+2026-01-23 00:23:08,718 - 
+[Epoch 0 Training]
+2026-01-23 00:23:11,443 - Iter 0/1891, Loss=2.2998, Loss=2.2998
+2026-01-23 00:23:19,798 - Iter 10/1891, Loss=1.2891, Loss=1.2891
+2026-01-23 00:23:28,094 - Iter 20/1891, Loss=1.3320, Loss=1.3320
+2026-01-23 00:23:36,434 - Iter 30/1891, Loss=1.3228, Loss=1.3228
+2026-01-23 00:23:44,736 - Iter 40/1891, Loss=1.2819, Loss=1.2819
+2026-01-23 00:23:53,067 - Iter 50/1891, Loss=1.3430, Loss=1.3430
+2026-01-23 00:24:01,370 - Iter 60/1891, Loss=1.3349, Loss=1.3349
+2026-01-23 00:24:09,682 - Iter 70/1891, Loss=1.3115, Loss=1.3115
+2026-01-23 00:24:17,963 - Iter 80/1891, Loss=1.3145, Loss=1.3145
+2026-01-23 00:24:26,265 - Iter 90/1891, Loss=1.2979, Loss=1.2979
+2026-01-23 00:24:34,544 - Iter 100/1891, Loss=1.3362, Loss=1.3362
+2026-01-23 00:24:42,795 - Iter 110/1891, Loss=1.3023, Loss=1.3023
+2026-01-23 00:24:51,102 - Iter 120/1891, Loss=1.2889, Loss=1.2889
