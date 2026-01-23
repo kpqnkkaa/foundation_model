@@ -45,11 +45,6 @@ class GazeLLE(nn.Module):
             if self.is_multi_output:
                 self.num_output_tokens = 3
                 self.multi_output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
-            
-            # Upscaling Head: 
-            # 负责将融合后的图像特征 (256维) 上采样并降维到 32维
-            # 这里的 32维 必须与 SAM 预训练 MLP 输出的权重维度一致
-            self.output_upscaling = self.backbone.fusion.output_upscaling
 
             # 注意：这里不再初始化 MLP，因为我们会直接使用 backbone.fusion 里的预训练 MLP
 
@@ -197,7 +192,8 @@ class GazeLLE(nn.Module):
             # F. 生成 Heatmap (Hypernetwork + Dot Product)
             
             # 1. 上采样图像特征 -> [Total_People, 32, H*4, W*4]
-            upscaled_embedding = self.output_upscaling(src)
+            output_upscaling = self.backbone.fusion.output_upscaling
+            upscaled_embedding = output_upscaling(src)
             b, c, h, w = upscaled_embedding.shape
 
             # 获取 SAM 内部所有的 MLP 层 (通常有 4 个)
