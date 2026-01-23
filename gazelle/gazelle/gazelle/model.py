@@ -4,25 +4,23 @@ import torchvision
 from timm.models.vision_transformer import Block
 import math
 import os
-from gazelle.backbone import DinoV2Backbone, SAMBackboneWrapper, SAMImageEncoder, GazeTextDecoder
+from gazelle.backbone import DinoV2Backbone, SAMBackboneWrapper
 import gazelle.utils as utils
-import torch.nn.functional as F
 
 class GazeLLE(nn.Module):
-    def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64), is_multi_output=False):
+    def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64)):
         super().__init__()
         self.backbone = backbone
         self.dim = dim
         self.num_layers = num_layers
-        self.is_multi_output = is_multi_output
-
+        
         # 获取 Backbone 输出特征图尺寸 (例如 448输入 -> 14x14 或 28x28)
         self.featmap_h, self.featmap_w = backbone.get_out_size(in_size)
         
         self.in_size = in_size
         self.out_size = out_size
         self.inout = inout
-
+        
         # 1. 判定是否为 SAM Backbone
         # 依赖于 backbone.py 中的定义，或者 getattr 检查
         self.is_sam = getattr(backbone, 'is_sam', False)
@@ -40,11 +38,6 @@ class GazeLLE(nn.Module):
             # Tokens: 如果有 inout，则需要 2 个 token [InOut, Heatmap]，否则 1 个 [Heatmap]
             self.num_output_tokens = 2 if self.inout else 1
             self.output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
-
-            # 要输出分割，方向分类，expression的结果
-            if self.is_multi_output:
-                self.num_output_tokens = 3
-                self.multi_output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
             
             # Upscaling Head: 
             # 负责将融合后的图像特征 (256维) 上采样并降维到 32维
@@ -67,15 +60,6 @@ class GazeLLE(nn.Module):
                     nn.Linear(128, 1),
                     nn.Sigmoid()
                 )
-            if self.is_multi_output:
-                # 8分类
-                self.direction_head = nn.Sequential(
-                    nn.Linear(self.dim, 128),
-                    nn.ReLU(),
-                    nn.Dropout(0.1),
-                    nn.Linear(128, 8)
-                )
-                self.text_head = GazeTextDecoder(input_dim=self.dim, model_name="gpt2", lora_r=8, max_len=25)
 
         else:
             # ================= Standard 分支初始化 =================
@@ -120,19 +104,13 @@ class GazeLLE(nn.Module):
         
         heatmap_preds = []
         inout_preds = None
-        seg_preds = None
-        direction_preds = None
-        text_preds = None
 
         # ==========================================
         #              SAM 逻辑分支
         # ==========================================
         if self.is_sam:
-            # print(input["gaze_point_expression_ids"])
             # 将 Batch 维度展开为 Total_People 维度
             # x becomes: [Total_People, dim, H, W]
-            if x.shape[1] != self.dim:
-                x = self.linear(x)
             x = utils.repeat_tensors(x, num_ppl_per_img)
             # A. 准备 Prompts (将归一化 bbox 转为绝对坐标)
             flat_bboxes = []
@@ -145,26 +123,17 @@ class GazeLLE(nn.Module):
                         xmax * self.in_size[1], 
                         ymax * self.in_size[0]
                     ])
-            flat_eyes = []
-            for eye in input["eyes"]:
-                flat_eyes.append([
-                    eye[0] * self.in_size[1],
-                    eye[1] * self.in_size[0]
-                ])
+            
             # [Total_People, 4]
             bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
-            eyes_tensor = torch.tensor(flat_eyes, device=x.device, dtype=torch.float32)
             
             # B. 获取 Sparse Embeddings (通过 Backbone 的 Prompt Encoder)
             # [Total_People, N_sparse, dim]
-            sparse_embeddings = self.backbone.prompt_encoder(bboxes_tensor, device=x.device, eyes=eyes_tensor, expr_ids=input["observer_expression_ids"])
+            sparse_embeddings = self.backbone.prompt_encoder(bboxes_tensor, device=x.device)
             
             # C. 准备 Learnable Tokens
             # tokens: [Total_People, Num_Tokens, dim]
             tokens = self.output_tokens.weight.unsqueeze(0).repeat(x.shape[0], 1, 1)
-            if self.is_multi_output:
-                multi_output_tokens = self.multi_output_tokens.weight.unsqueeze(0).repeat(x.shape[0], 1, 1)
-                tokens = torch.cat((tokens, multi_output_tokens), dim=1)
             # 拼接: [Tokens, Sparse_Prompts]
             tokens = torch.cat((tokens, sparse_embeddings), dim=1)
 
@@ -172,66 +141,46 @@ class GazeLLE(nn.Module):
             # src: 更新后的图像特征 [Total_People, dim, H, W]
             # hs:  更新后的 Tokens [Total_People, N_total, dim]
             # 注意：确保 backbone.py 中的 SAMFusion 返回顺序也是 (image, tokens)
-            # print(x.shape, tokens.shape)
-            hs, src = self.backbone.fusion(image_embeddings=x, tokens=tokens)
-            current_idx = 0 # 使用指针，不管是否有 inout 都能对齐
+            src, hs = self.backbone.fusion(image_embeddings=x, tokens=tokens)
             
-            # 1. InOut 任务
+            # E. 提取 Token 进行预测
             if self.inout:
-                inout_token_out = hs[:, current_idx, :]
+                # 约定: token 0 是 InOut, token 1 是 Heatmap
+                inout_token_out = hs[:, 0, :] 
+                heatmap_token_out = hs[:, 1, :]
+                
+                # 预测 InOut
                 inout_preds_flat = self.inout_head(inout_token_out).squeeze(dim=-1)
                 inout_preds = utils.split_tensors(inout_preds_flat, num_ppl_per_img)
-                current_idx += 1
-            
-            # 2. Heatmap Token (必须存在)
-            heatmap_token_out = hs[:, current_idx, :]
-            current_idx += 1
-      
-            # 3. Multi Output Tokens
-            seg_token_out = None
-            if self.is_multi_output:
-                seg_token_out = hs[:, current_idx, :]      # Seg
-                direction_token_out = hs[:, current_idx+1, :] # Dir
-                text_token_out = hs[:, current_idx+2, :] # Text
-                current_idx += 3 # 虽然不用了，但保持习惯
-
-                dir_flat = self.direction_head(direction_token_out).squeeze(dim=-1)
-                direction_preds = utils.split_tensors(dir_flat, num_ppl_per_img)
-                text_preds = self.text_head(fusion_feat = text_token_out, target_ids = input["gaze_point_expression_ids"])
+            else:
+                # 只有 Heatmap Token
+                heatmap_token_out = hs[:, 0, :]
 
             # F. 生成 Heatmap (Hypernetwork + Dot Product)
             
             # 1. 上采样图像特征 -> [Total_People, 32, H*4, W*4]
             upscaled_embedding = self.output_upscaling(src)
-            b, c, h, w = upscaled_embedding.shape
-
-            # 获取 SAM 内部所有的 MLP 层 (通常有 4 个)
-            mlp_layers = self.backbone.fusion.output_hypernetworks_mlps
-
-            # --- 生成 Heatmap (使用第 0 个 MLP) ---
-            heatmap_mlp = mlp_layers[0] 
-            hyper_weights = heatmap_mlp(heatmap_token_out)
             
+            # 2. 生成动态权重 -> [Total_People, 32]
+            # 【关键】直接使用 Backbone 中加载了预训练权重的 MLP
+            # SAM 的 output_hypernetworks_mlps 是一个 ModuleList，我们取第0个（对应Mask Token）
+            mlp_layer = self.backbone.fusion.output_hypernetworks_mlps[0]
+            hyper_weights = mlp_layer(heatmap_token_out)
+            
+            # 3. 点积 (Dynamic Convolution)
+            b, c, h, w = upscaled_embedding.shape
+            # (B, 1, C) @ (B, C, H*W) -> (B, 1, H*W)
             heatmap = (hyper_weights.unsqueeze(1) @ upscaled_embedding.view(b, c, h * w))
-            heatmap = heatmap.view(b, 1, h, w)
+            heatmap = heatmap.view(b, 1, h, w) 
+            
+            # 4. 调整尺寸并激活
             if heatmap.shape[-2:] != self.out_size:
                 heatmap = F.interpolate(heatmap, size=self.out_size, mode='bilinear', align_corners=False)
-            heatmap = torch.sigmoid(heatmap).squeeze(1)
-            heatmap_preds = utils.split_tensors(heatmap, num_ppl_per_img)
             
-            # --- 生成 Seg (使用第 1 个 MLP) ---
-            if self.is_multi_output and seg_token_out is not None:
-                # 关键：使用 index 1，与 Heatmap 区分开
-                seg_mlp = mlp_layers[1] 
-                
-                seg_weights = seg_mlp(seg_token_out)
-                
-                seg = (seg_weights.unsqueeze(1) @ upscaled_embedding.view(b, c, h * w))
-                seg = seg.view(b, 1, h, w)
-                if seg.shape[-2:] != self.out_size:
-                    seg = F.interpolate(seg, size=self.out_size, mode='bilinear', align_corners=False)
-                seg = torch.sigmoid(seg).squeeze(1)
-                seg_preds = utils.split_tensors(seg, num_ppl_per_img)
+            heatmap = torch.sigmoid(heatmap).squeeze(1)
+            
+            # 将 Tensor 拆回 List [B_img1, B_img2...]
+            heatmap_preds = utils.split_tensors(heatmap, num_ppl_per_img)
 
         # ==========================================
         #            Standard 逻辑分支
@@ -241,7 +190,7 @@ class GazeLLE(nn.Module):
             x = x + self.pos_embed
             
             x = utils.repeat_tensors(x, num_ppl_per_img)
-
+            
             # A. 叠加 Head Maps
             head_maps = torch.cat(self.get_input_head_maps(input["bboxes"]), dim=0).to(x.device) 
             head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
@@ -274,11 +223,7 @@ class GazeLLE(nn.Module):
             x = x.squeeze(1)
             heatmap_preds = utils.split_tensors(x, num_ppl_per_img)
 
-        return {"heatmap": heatmap_preds, 
-                "inout": inout_preds,
-                "seg": seg_preds,
-                "direction": direction_preds,
-                "text_loss": text_preds}
+        return {"heatmap": heatmap_preds, "inout": inout_preds}
 
     def get_input_head_maps(self, bboxes):
         # bboxes: [[(xmin, ymin, xmax, ymax)]] - list of list of head bboxes per image
@@ -301,16 +246,23 @@ class GazeLLE(nn.Module):
             head_maps.append(torch.stack(img_head_maps))
         return head_maps
     
-    def get_gazelle_state_dict(self):
-        return self.state_dict()
-
-    def load_gazelle_state_dict(self, ckpt_state_dict):
+    def get_gazelle_state_dict(self, include_backbone=False):
+        if include_backbone:
+            return self.state_dict()
+        else:
+            return {k: v for k, v in self.state_dict().items() if not k.startswith("backbone")}
+        
+    def load_gazelle_state_dict(self, ckpt_state_dict, include_backbone=False):
         current_state_dict = self.state_dict()
         keys1 = current_state_dict.keys()
         keys2 = ckpt_state_dict.keys()
 
-        keys1 = set(keys1)
-        keys2 = set(keys2)
+        if not include_backbone:
+            keys1 = set([k for k in keys1 if not k.startswith("backbone")])
+            keys2 = set([k for k in keys2 if not k.startswith("backbone")])
+        else:
+            keys1 = set(keys1)
+            keys2 = set(keys2)
 
         if len(keys2 - keys1) > 0:
             print("WARNING unused keys in provided state dict: ", keys2 - keys1)
@@ -356,13 +308,9 @@ def get_gazelle_model(model_name):
         "gazelle_dinov2_vitl14": gazelle_dinov2_vitl14,
         "gazelle_dinov2_vitb14_inout": gazelle_dinov2_vitb14_inout,
         "gazelle_dinov2_vitl14_inout": gazelle_dinov2_vitl14_inout,
-        # 新增sam模型
-        "gazelle_sam_vitb": gazelle_sam_vitb,
-        "sam_dinov2_vitb": sam_dinov2_vitb,
-        "sam_dinov2_vitb_lora": sam_dinov2_vitb_lora,
-        "sam_sam_vitb_lora": sam_sam_vitb_lora,
-        "sam_dinov2_vitb_lora_multi_input": sam_dinov2_vitb_lora_multi_input,
-        "sam_dinov2_vitb_lora_multi_output_input": sam_dinov2_vitb_lora_multi_output_input
+        # 新增 SAM 模型
+        "sam_vitb": sam_vitb,
+        "sam_vitb_inout": sam_vitb_inout,
     }
     assert model_name in factory.keys(), "invalid model name"
     return factory[model_name]()
@@ -391,41 +339,56 @@ def gazelle_dinov2_vitl14_inout():
     model = GazeLLE(backbone, inout=True)
     return model, transform
 
-def gazelle_sam_vitb():
-    backbone = SAMImageEncoder(model_type="vit_b", in_size=(448, 448))
-    transform = backbone.get_transform((448, 448))
-    model = GazeLLE(backbone, inout=False)
-    return model, transform
+# === 新增：SAM 权重自动下载逻辑 ===
 
-def sam_dinov2_vitb():
+SAM_URLS = {
+    "vit_b": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth",
+    "vit_l": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_l_0b3195.pth",
+    "vit_h": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth",
+}
+
+def get_sam_checkpoint_path(model_type):
+    """
+    检查 PyTorch 缓存中是否有权重，如果没有则自动下载。
+    模仿 torch.hub 的行为。
+    """
+    if model_type not in SAM_URLS:
+        raise ValueError(f"Invalid SAM model type: {model_type}. Options: {list(SAM_URLS.keys())}")
+
+    url = SAM_URLS[model_type]
+    # 获取 PyTorch Hub 的标准缓存目录 (通常是 ~/.cache/torch/hub/checkpoints)
+    model_dir = os.path.join(torch.hub.get_dir(), "checkpoints")
+    os.makedirs(model_dir, exist_ok=True)
+
+    filename = os.path.basename(url)
+    filepath = os.path.join(model_dir, filename)
+
+    if not os.path.exists(filepath):
+        print(f"Downloading SAM {model_type} checkpoint to {filepath} ...")
+        # 使用 torch 提供的工具下载，支持进度条
+        torch.hub.download_url_to_file(url, filepath)
+    else:
+        print(f"Found existing SAM checkpoint at {filepath}")
+
+    return filepath
+
+
+# === 更新后的工厂函数 ===
+
+def sam_vitb():
     # 自动获取路径，不存在则下载
     checkpoint = get_sam_checkpoint_path("vit_b")
     
-    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=False, is_multi_input=False)
+    backbone = SAMBackboneWrapper(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448))
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
     return model, transform
 
-def sam_dinov2_vitb_lora():
-    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=False)
-    transform = backbone.get_transform((448, 448))
-    model = GazeLLE(backbone, inout=False)
-    return model, transform
-
-def sam_sam_vitb_lora():
-    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=True, is_multi_input=False)
-    transform = backbone.get_transform((448, 448))
-    model = GazeLLE(backbone, inout=False)
-    return model, transform
-
-def sam_dinov2_vitb_lora_multi_input():
-    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=True)
-    transform = backbone.get_transform((448, 448))
-    model = GazeLLE(backbone, inout=False)
-    return model, transform
+def sam_vitb_inout():
+    # 自动获取路径，不存在则下载
+    checkpoint = get_sam_checkpoint_path("vit_b")
     
-def sam_dinov2_vitb_lora_multi_output_input():
-    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=True)
+    backbone = SAMBackboneWrapper(checkpoint_path=checkpoint, model_type="vit_b", in_size=(448, 448))
     transform = backbone.get_transform((448, 448))
-    model = GazeLLE(backbone, inout=False, is_multi_output=True)
+    model = GazeLLE(backbone, inout=True)
     return model, transform
