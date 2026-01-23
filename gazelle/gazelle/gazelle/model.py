@@ -46,8 +46,12 @@ class GazeLLE(nn.Module):
                 self.num_output_tokens = 3
                 self.multi_output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
 
-            # 注意：这里不再初始化 MLP，因为我们会直接使用 backbone.fusion 里的预训练 MLP
-
+            self.heatmap_head = nn.Sequential(
+                nn.ConvTranspose2d(dim, dim, kernel_size=2, stride=2),
+                nn.Conv2d(dim, 1, kernel_size=1, bias=False),
+                nn.Sigmoid()
+            )
+            
             # InOut 分类头 (如果需要)
             if self.inout:
                  self.inout_head = nn.Sequential(
@@ -191,25 +195,30 @@ class GazeLLE(nn.Module):
 
             # F. 生成 Heatmap (Hypernetwork + Dot Product)
             
-            # 1. 上采样图像特征 -> [Total_People, 32, H*4, W*4]
-            output_upscaling = self.backbone.fusion.output_upscaling
-            upscaled_embedding = output_upscaling(src)
-            b, c, h, w = upscaled_embedding.shape
+            # # 1. 上采样图像特征 -> [Total_People, 32, H*4, W*4]
+            # output_upscaling = self.backbone.fusion.output_upscaling
+            # upscaled_embedding = output_upscaling(src)
+            # b, c, h, w = upscaled_embedding.shape
 
-            # 获取 SAM 内部所有的 MLP 层 (通常有 4 个)
-            mlp_layers = self.backbone.fusion.output_hypernetworks_mlps
+            # # 获取 SAM 内部所有的 MLP 层 (通常有 4 个)
+            # mlp_layers = self.backbone.fusion.output_hypernetworks_mlps
 
-            # --- 生成 Heatmap (使用第 0 个 MLP) ---
-            heatmap_mlp = mlp_layers[0] 
-            hyper_weights = heatmap_mlp(heatmap_token_out)
+            # # --- 生成 Heatmap (使用第 0 个 MLP) ---
+            # heatmap_mlp = mlp_layers[0] 
+            # hyper_weights = heatmap_mlp(heatmap_token_out)
             
-            heatmap = (hyper_weights.unsqueeze(1) @ upscaled_embedding.view(b, c, h * w))
-            heatmap = heatmap.view(b, 1, h, w)
-            if heatmap.shape[-2:] != self.out_size:
-                heatmap = F.interpolate(heatmap, size=self.out_size, mode='bilinear', align_corners=False)
-            heatmap = torch.sigmoid(heatmap).squeeze(1)
-            heatmap_preds = utils.split_tensors(heatmap, num_ppl_per_img)
+            # heatmap = (hyper_weights.unsqueeze(1) @ upscaled_embedding.view(b, c, h * w))
+            # heatmap = heatmap.view(b, 1, h, w)
+            # if heatmap.shape[-2:] != self.out_size:
+            #     heatmap = F.interpolate(heatmap, size=self.out_size, mode='bilinear', align_corners=False)
+            # heatmap = torch.sigmoid(heatmap).squeeze(1)
+            # heatmap_preds = utils.split_tensors(heatmap, num_ppl_per_img)
             
+            heatmap = self.heatmap_head(heatmap_token_out)  # [Total_People, 1, H, W]   
+            heatmap_preds = torch.transforms.functional.resize(heatmap, self.out_size)
+            heatmap_preds = heatmap_preds.squeeze(1)
+            heatmap_preds = utils.split_tensors(heatmap_preds, num_ppl_per_img)
+
             # --- 生成 Seg (使用第 1 个 MLP) ---
             if self.is_multi_output and seg_token_out is not None:
                 # 关键：使用 index 1，与 Heatmap 区分开
