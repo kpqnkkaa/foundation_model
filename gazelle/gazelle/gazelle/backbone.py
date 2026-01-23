@@ -276,13 +276,11 @@ class SAMFusion(nn.Module):
         super().__init__()
         checkpoint_path = get_sam_checkpoint_path(model_type)
         from segment_anything import sam_model_registry # 确保这里能引用到
-        # 不加载checkpoint，只加载模型结构
-        sam_model = sam_model_registry[model_type]()
-        # sam_model = sam_model_registry[model_type](checkpoint=checkpoint_path)
+        sam_model = sam_model_registry[model_type](checkpoint=checkpoint_path)
         self.transformer = sam_model.mask_decoder.transformer
         self.pe_layer = sam_model.prompt_encoder.pe_layer 
-        # self.output_hypernetworks_mlps = sam_model.mask_decoder.output_hypernetworks_mlps
-        # self.output_upscaling = sam_model.mask_decoder.output_upscaling
+        self.output_hypernetworks_mlps = sam_model.mask_decoder.output_hypernetworks_mlps
+        self.output_upscaling = sam_model.mask_decoder.output_upscaling
 
         del sam_model.image_encoder
         del sam_model.prompt_encoder
