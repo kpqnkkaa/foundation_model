@@ -49,13 +49,8 @@ class GazeLLE(nn.Module):
             # Upscaling Head: 
             # 负责将融合后的图像特征 (256维) 上采样并降维到 32维
             # 这里的 32维 必须与 SAM 预训练 MLP 输出的权重维度一致
-            self.output_upscaling = nn.Sequential(
-                nn.ConvTranspose2d(dim, dim // 4, kernel_size=2, stride=2),
-                nn.LayerNorm([dim // 4, self.featmap_h * 2, self.featmap_w * 2]),
-                nn.GELU(),
-                nn.ConvTranspose2d(dim // 4, dim // 8, kernel_size=2, stride=2),
-                nn.GELU(),
-            )
+            self.output_upscaling = self.backbone.fusion.output_upscaling
+            
             # 注意：这里不再初始化 MLP，因为我们会直接使用 backbone.fusion 里的预训练 MLP
 
             # InOut 分类头 (如果需要)
