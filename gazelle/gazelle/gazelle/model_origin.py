@@ -23,7 +23,8 @@ class GazeLLE(nn.Module):
         self.out_size = out_size
         self.inout = inout
 
-        # 1. 判定是否为 SAM Backbone (用于保留调用 prompt_encoder 的能力，但不用于走 SAM 分支逻辑)
+        # 1. 判定是否为 SAM Backbone
+        # 依赖于 backbone.py 中的定义，或者 getattr 检查
         self.is_sam = getattr(backbone, 'is_sam', False)
 
         # 2. 基础组件 (所有模式共用)
@@ -33,72 +34,70 @@ class GazeLLE(nn.Module):
         # 位置编码
         self.register_buffer("pos_embed", positionalencoding2d(self.dim, self.featmap_h, self.featmap_w))
 
-        # 3. 分支逻辑构建 - 【修改：强制走类似 Standard 的初始化，但不做 Head Map 的 embedding】
-        
-        # if self.is_sam:
-        #     # ================= SAM 分支初始化 (已注释) =================
-        #     # Tokens: 如果有 inout，则需要 2 个 token [InOut, Heatmap]，否则 1 个 [Heatmap]
-        #     self.num_output_tokens = 2 if self.inout else 1
-        #     self.output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
+        # 3. 分支逻辑构建
+        if self.is_sam:
+            # ================= SAM 分支初始化 =================
+            # Tokens: 如果有 inout，则需要 2 个 token [InOut, Heatmap]，否则 1 个 [Heatmap]
+            self.num_output_tokens = 2 if self.inout else 1
+            self.output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
 
-        #     # 要输出分割，方向分类，expression的结果
-        #     if self.is_multi_output:
-        #         self.num_output_tokens = 3
-        #         self.multi_output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
+            # 要输出分割，方向分类，expression的结果
+            if self.is_multi_output:
+                self.num_output_tokens = 3
+                self.multi_output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
 
-        #     # 注意：这里不再初始化 MLP，因为我们会直接使用 backbone.fusion 里的预训练 MLP
+            # 注意：这里不再初始化 MLP，因为我们会直接使用 backbone.fusion 里的预训练 MLP
 
-        #     # InOut 分类头 (如果需要)
-        #     if self.inout:
-        #          self.inout_head = nn.Sequential(
-        #             nn.Linear(self.dim, 128),
-        #             nn.ReLU(),
-        #             nn.Dropout(0.1),
-        #             nn.Linear(128, 1),
-        #             nn.Sigmoid()
-        #         )
-        #     if self.is_multi_output:
-        #         # 8分类
-        #         self.direction_head = nn.Sequential(
-        #             nn.Linear(self.dim, 128),
-        #             nn.ReLU(),
-        #             nn.Dropout(0.1),
-        #             nn.Linear(128, 8)
-        #         )
-        #         self.text_head = GazeTextDecoder(input_dim=self.dim, model_name="gpt2", lora_r=8, max_len=25)
+            # InOut 分类头 (如果需要)
+            if self.inout:
+                 self.inout_head = nn.Sequential(
+                    nn.Linear(self.dim, 128),
+                    nn.ReLU(),
+                    nn.Dropout(0.1),
+                    nn.Linear(128, 1),
+                    nn.Sigmoid()
+                )
+            if self.is_multi_output:
+                # 8分类
+                self.direction_head = nn.Sequential(
+                    nn.Linear(self.dim, 128),
+                    nn.ReLU(),
+                    nn.Dropout(0.1),
+                    nn.Linear(128, 8)
+                )
+                self.text_head = GazeTextDecoder(input_dim=self.dim, model_name="gpt2", lora_r=8, max_len=25)
 
-        # else:
-        # ================= Standard 分支初始化 (修改版) =================
-        # self.head_token = nn.Embedding(1, self.dim) # 【移除】不再需要 Head Map 的 Token
-        
-        if self.inout: 
-            self.inout_token = nn.Embedding(1, self.dim)
-        
-        # 标准 Transformer Decoder (Self-Attention)
-        self.transformer = nn.Sequential(*[
-            Block(
-                dim=self.dim, 
-                num_heads=8, 
-                mlp_ratio=4, 
-                drop_path=0.1)
-            for i in range(num_layers)
-        ])
-        
-        # 简单的反卷积头生成 Heatmap (Standard 方式)
-        self.heatmap_head = nn.Sequential(
-            nn.ConvTranspose2d(dim, dim, kernel_size=2, stride=2),
-            nn.Conv2d(dim, 1, kernel_size=1, bias=False),
-            nn.Sigmoid()
-        )
-        
-        if self.inout: 
-            self.inout_head = nn.Sequential(
-                nn.Linear(self.dim, 128),
-                nn.ReLU(),
-                nn.Dropout(0.1),
-                nn.Linear(128, 1),
+        else:
+            # ================= Standard 分支初始化 =================
+            self.head_token = nn.Embedding(1, self.dim)
+            if self.inout: 
+                self.inout_token = nn.Embedding(1, self.dim)
+            
+            # 标准 Transformer Decoder
+            self.transformer = nn.Sequential(*[
+                Block(
+                    dim=self.dim, 
+                    num_heads=8, 
+                    mlp_ratio=4, 
+                    drop_path=0.1)
+                for i in range(num_layers)
+            ])
+            
+            # 简单的反卷积头生成 Heatmap
+            self.heatmap_head = nn.Sequential(
+                nn.ConvTranspose2d(dim, dim, kernel_size=2, stride=2),
+                nn.Conv2d(dim, 1, kernel_size=1, bias=False),
                 nn.Sigmoid()
             )
+            
+            if self.inout: 
+                self.inout_head = nn.Sequential(
+                    nn.Linear(self.dim, 128),
+                    nn.ReLU(),
+                    nn.Dropout(0.1),
+                    nn.Linear(128, 1),
+                    nn.Sigmoid()
+                )
 
     def forward(self, input):
         # input["images"]: [B, 3, H, W]
@@ -116,15 +115,15 @@ class GazeLLE(nn.Module):
         text_preds = None
 
         # ==========================================
-        #       SAM 逻辑分支 (已注释) -> 改为提取 Prompt 特征供下面使用
+        #              SAM 逻辑分支
         # ==========================================
-        # if self.is_sam:
-        #     # ... (原 SAM 逻辑)
-        #     pass 
-
-        # 【新增】即便走 Standard 流程，我们也在这里提取 SAM Prompt Embeddings
-        # 只有当 backbone 支持 prompt_encoder 时才执行 (假设你是用的 sam backbone 及其 wrapper)
-        if hasattr(self.backbone, 'prompt_encoder'):
+        if self.is_sam:
+            # print(input["gaze_point_expression_ids"])
+            # 将 Batch 维度展开为 Total_People 维度
+            # x becomes: [Total_People, dim, H, W]
+            if x.shape[1] != self.dim:
+                x = self.linear(x)
+            x = utils.repeat_tensors(x, num_ppl_per_img)
             # A. 准备 Prompts (将归一化 bbox 转为绝对坐标)
             flat_bboxes = []
             for bbox_list in input["bboxes"]:
@@ -142,90 +141,129 @@ class GazeLLE(nn.Module):
                     eye[0] * self.in_size[1],
                     eye[1] * self.in_size[0]
                 ])
-            
             # [Total_People, 4]
-            # 注意：如果 dim 还没变 (Linear层在后面)，这里需要处理 device 问题
             bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
             eyes_tensor = torch.tensor(flat_eyes, device=x.device, dtype=torch.float32)
             
-            # B. 获取 Sparse Embeddings [Total_People, N_sparse, dim]
-            # 这些 Embedding 包含了位置信息
-            sparse_embeddings = self.backbone.prompt_encoder(
-                bboxes_tensor, 
-                device=x.device, 
-                eyes=eyes_tensor, 
-                expr_ids=input.get("observer_expression_ids", None)
-            )
+            # B. 获取 Sparse Embeddings (通过 Backbone 的 Prompt Encoder)
+            # [Total_People, N_sparse, dim]
+            sparse_embeddings = self.backbone.prompt_encoder(bboxes_tensor, device=x.device, eyes=eyes_tensor, expr_ids=input["observer_expression_ids"])
+            
+            # C. 准备 Learnable Tokens
+            # tokens: [Total_People, Num_Tokens, dim]
+            tokens = self.output_tokens.weight.unsqueeze(0).repeat(x.shape[0], 1, 1)
+            if self.is_multi_output:
+                multi_output_tokens = self.multi_output_tokens.weight.unsqueeze(0).repeat(x.shape[0], 1, 1)
+                tokens = torch.cat((tokens, multi_output_tokens), dim=1)
+            # 拼接: [Tokens, Sparse_Prompts]
+            tokens = torch.cat((tokens, sparse_embeddings), dim=1)
+
+            # D. Two-Way Fusion (双向交互)
+            # src: 更新后的图像特征 [Total_People, dim, H, W]
+            # hs:  更新后的 Tokens [Total_People, N_total, dim]
+            # 注意：确保 backbone.py 中的 SAMFusion 返回顺序也是 (image, tokens)
+            # print(x.shape, tokens.shape)
+            hs, src = self.backbone.fusion(image_embeddings=x, tokens=tokens)
+            current_idx = 0 # 使用指针，不管是否有 inout 都能对齐
+            
+            # 1. InOut 任务
+            if self.inout:
+                inout_token_out = hs[:, current_idx, :]
+                inout_preds_flat = self.inout_head(inout_token_out).squeeze(dim=-1)
+                inout_preds = utils.split_tensors(inout_preds_flat, num_ppl_per_img)
+                current_idx += 1
+            
+            # 2. Heatmap Token (必须存在)
+            heatmap_token_out = hs[:, current_idx, :]
+            current_idx += 1
+      
+            # 3. Multi Output Tokens
+            seg_token_out = None
+            if self.is_multi_output:
+                seg_token_out = hs[:, current_idx, :]      # Seg
+                direction_token_out = hs[:, current_idx+1, :] # Dir
+                text_token_out = hs[:, current_idx+2, :] # Text
+                current_idx += 3 # 虽然不用了，但保持习惯
+
+                dir_flat = self.direction_head(direction_token_out).squeeze(dim=-1)
+                direction_preds = utils.split_tensors(dir_flat, num_ppl_per_img)
+                text_preds = self.text_head(fusion_feat = text_token_out, target_ids = input["gaze_point_expression_ids"])
+
+            # F. 生成 Heatmap (Hypernetwork + Dot Product)
+            
+            # 1. 上采样图像特征 -> [Total_People, 32, H*4, W*4]
+            output_upscaling = self.backbone.fusion.output_upscaling
+            upscaled_embedding = output_upscaling(src)
+            b, c, h, w = upscaled_embedding.shape
+
+            # 获取 SAM 内部所有的 MLP 层 (通常有 4 个)
+            mlp_layers = self.backbone.fusion.output_hypernetworks_mlps
+
+            # --- 生成 Heatmap (使用第 0 个 MLP) ---
+            heatmap_mlp = mlp_layers[0] 
+            hyper_weights = heatmap_mlp(heatmap_token_out)
+            
+            heatmap = (hyper_weights.unsqueeze(1) @ upscaled_embedding.view(b, c, h * w))
+            heatmap = heatmap.view(b, 1, h, w)
+            if heatmap.shape[-2:] != self.out_size:
+                heatmap = F.interpolate(heatmap, size=self.out_size, mode='bilinear', align_corners=False)
+            heatmap = torch.sigmoid(heatmap).squeeze(1)
+            heatmap_preds = utils.split_tensors(heatmap, num_ppl_per_img)
+            
+            # --- 生成 Seg (使用第 1 个 MLP) ---
+            if self.is_multi_output and seg_token_out is not None:
+                # 关键：使用 index 1，与 Heatmap 区分开
+                seg_mlp = mlp_layers[1] 
+                
+                seg_weights = seg_mlp(seg_token_out)
+                
+                seg = (seg_weights.unsqueeze(1) @ upscaled_embedding.view(b, c, h * w))
+                seg = seg.view(b, 1, h, w)
+                if seg.shape[-2:] != self.out_size:
+                    seg = F.interpolate(seg, size=self.out_size, mode='bilinear', align_corners=False)
+                seg = torch.sigmoid(seg).squeeze(1)
+                seg_preds = utils.split_tensors(seg, num_ppl_per_img)
+
+        # ==========================================
+        #            Standard 逻辑分支
+        # ==========================================
         else:
-            raise ValueError("当前消融实验需要 Backbone 具备 prompt_encoder 能力 (is_sam=True的backbone)，但走 Standard 流程。")
+            x = self.linear(x) # [B, dim, H, W]
+            x = x + self.pos_embed
+            
+            x = utils.repeat_tensors(x, num_ppl_per_img)
 
+            # A. 叠加 Head Maps
+            head_maps = torch.cat(self.get_input_head_maps(input["bboxes"]), dim=0).to(x.device) 
+            head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
+            x = x + head_map_embeddings
 
-        # ==========================================
-        #             Standard 逻辑分支 (修改版)
-        # ==========================================
-        # else:
-        
-        # 1. 图像特征投影 [B, dim, H, W]
-        if x.shape[1] != self.dim:
-            x = self.linear(x) 
-        
-        # 2. 加上位置编码
-        x = x + self.pos_embed
-        
-        # 3. 扩展到 Person 维度 [Total_People, dim, H, W]
-        x = utils.repeat_tensors(x, num_ppl_per_img)
+            # B. Flatten 准备进入 Transformer
+            # "b c h w -> b (h w) c"
+            x = x.flatten(start_dim=2).permute(0, 2, 1)
+            
+            if self.inout:
+                inout_t = self.inout_token.weight.unsqueeze(dim=0).repeat(x.shape[0], 1, 1)
+                x = torch.cat([inout_t, x], dim=1)
+            
+            # C. Transformer 交互
+            x = self.transformer(x)
 
-        # 【移除】 A. 叠加 Head Maps
-        # head_maps = torch.cat(self.get_input_head_maps(input["bboxes"]), dim=0).to(x.device) 
-        # head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
-        # x = x + head_map_embeddings
-
-        # B. Flatten 准备进入 Transformer
-        # "b c h w -> b (h w) c"
-        # [Total_People, H*W, dim]
-        x_flat = x.flatten(start_dim=2).permute(0, 2, 1)
-        
-        # 【新增】将 SAM 的 Prompt Embeddings 拼接到序列前面
-        # sparse_embeddings: [Total_People, N, dim]
-        # x_input: [Total_People, N + H*W, dim]
-        x_input = torch.cat([sparse_embeddings, x_flat], dim=1)
-
-        # 处理 InOut Token (如果有)
-        if self.inout:
-            inout_t = self.inout_token.weight.unsqueeze(dim=0).repeat(x_input.shape[0], 1, 1)
-            x_input = torch.cat([inout_t, x_input], dim=1)
-        
-        # C. Transformer 交互 (Self-Attention)
-        # 这里的 Transformer 现在同时处理 Prompt 和 Image Tokens
-        x_out = self.transformer(x_input)
-
-        # D. 解码 InOut
-        current_idx = 0
-        if self.inout:
-            inout_tokens = x_out[:, 0, :] 
-            inout_preds_flat = self.inout_head(inout_tokens).squeeze(dim=-1)
-            inout_preds = utils.split_tensors(inout_preds_flat, num_ppl_per_img)
-            current_idx += 1 # 跳过 inout token
-        
-        # E. 解码 Heatmap
-        # 我们只取回原本图像部分的 Token
-        # sparse_embeddings 的长度
-        num_prompts = sparse_embeddings.shape[1]
-        
-        # 现在的序列结构是: [InOut(可选), Prompts(N), Image(H*W)]
-        # 我们要切出 Image 部分
-        start_img_idx = current_idx + num_prompts
-        x_img = x_out[:, start_img_idx:, :]
-        
-        # Reshape 回空间维度 [Total_People, dim, H, W]
-        x_img = x_img.permute(0, 2, 1).reshape(x_img.shape[0], self.dim, self.featmap_h, self.featmap_w)
-        
-        # 使用 Standard 的反卷积头
-        heatmap = self.heatmap_head(x_img)
-        
-        heatmap = torchvision.transforms.functional.resize(heatmap, self.out_size)
-        heatmap = heatmap.squeeze(1)
-        heatmap_preds = utils.split_tensors(heatmap, num_ppl_per_img)
+            # D. 解码 InOut
+            if self.inout:
+                inout_tokens = x[:, 0, :] 
+                inout_preds_flat = self.inout_head(inout_tokens).squeeze(dim=-1)
+                inout_preds = utils.split_tensors(inout_preds_flat, num_ppl_per_img)
+                x = x[:, 1:, :] 
+            
+            # E. 解码 Heatmap
+            # Reshape 回空间维度
+            x = x.permute(0, 2, 1).reshape(x.shape[0], self.dim, self.featmap_h, self.featmap_w)
+            
+            x = self.heatmap_head(x)
+            x = torchvision.transforms.functional.resize(x, self.out_size)
+            x = x.squeeze(1)
+            heatmap_preds = utils.split_tensors(x, num_ppl_per_img)
 
         return {"heatmap": heatmap_preds, 
                 "inout": inout_preds,
@@ -233,7 +271,6 @@ class GazeLLE(nn.Module):
                 "direction": direction_preds,
                 "text_loss": text_preds}
 
-    # ... (get_input_head_maps 等函数保持不变或不再使用) ...
     def get_input_head_maps(self, bboxes):
         # bboxes: [[(xmin, ymin, xmax, ymax)]] - list of list of head bboxes per image
         head_maps = []
@@ -276,7 +313,8 @@ class GazeLLE(nn.Module):
         
         self.load_state_dict(current_state_dict, strict=False)
 
-# ... (positionalencoding2d 和模型工厂函数保持不变) ...
+
+# From https://github.com/wzlxjtu/PositionalEncoding2D/blob/master/positionalembedding2d.py
 def positionalencoding2d(d_model, height, width):
     """
     :param d_model: dimension of the model
@@ -300,7 +338,7 @@ def positionalencoding2d(d_model, height, width):
     pe[d_model + 1::2, :, :] = torch.cos(pos_h * div_term).transpose(0, 1).unsqueeze(2).repeat(1, 1, width)
 
     return pe
-
+    
 
 # models
 def get_gazelle_model(model_name):
