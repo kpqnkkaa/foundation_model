@@ -1,0 +1,48 @@
+2026-01-26 17:44:26,418 - Experiment Config: {'model': 'dinov2_vitb_lora', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'ckpt_save_dir': './experiments', 'wandb_project': 'dinov2_vitb_lora', 'exp_name': 'dinov2_vitb_lora', 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
+2026-01-26 17:44:29,931 - Learnable parameters: 3121664
+2026-01-26 17:44:36,141 - 
+[Epoch 0 Training]
+2026-01-26 17:44:42,396 - Iter 0/1891, heatmap Loss=0.7042, Loss=0.7042
+2026-01-26 17:44:58,070 - Iter 10/1891, heatmap Loss=0.0687, Loss=0.0687
+2026-01-26 17:45:10,800 - Iter 20/1891, heatmap Loss=0.0642, Loss=0.0642
+2026-01-26 17:45:22,954 - Iter 30/1891, heatmap Loss=0.0590, Loss=0.0590
+2026-01-26 17:45:35,038 - Iter 40/1891, heatmap Loss=0.0549, Loss=0.0549
+2026-01-26 17:45:47,536 - Iter 50/1891, heatmap Loss=0.0526, Loss=0.0526
+2026-01-26 17:45:59,908 - Iter 60/1891, heatmap Loss=0.0483, Loss=0.0483
+2026-01-26 17:46:12,623 - Iter 70/1891, heatmap Loss=0.0486, Loss=0.0486
+2026-01-26 17:46:25,086 - Iter 80/1891, heatmap Loss=0.0522, Loss=0.0522
+2026-01-26 17:46:37,684 - Iter 90/1891, heatmap Loss=0.0542, Loss=0.0542
+2026-01-26 17:46:50,121 - Iter 100/1891, heatmap Loss=0.0490, Loss=0.0490
+2026-01-26 17:47:02,690 - Iter 110/1891, heatmap Loss=0.0513, Loss=0.0513
+2026-01-26 17:47:14,525 - Iter 120/1891, heatmap Loss=0.0503, Loss=0.0503
+2026-01-26 17:47:26,586 - Iter 130/1891, heatmap Loss=0.0527, Loss=0.0527
+2026-01-26 17:47:39,035 - Iter 140/1891, heatmap Loss=0.0514, Loss=0.0514
+2026-01-26 17:47:51,209 - Iter 150/1891, heatmap Loss=0.0453, Loss=0.0453
+2026-01-26 17:48:03,919 - Iter 160/1891, heatmap Loss=0.0502, Loss=0.0502
+2026-01-26 17:48:16,335 - Iter 170/1891, heatmap Loss=0.0506, Loss=0.0506
+2026-01-26 17:48:28,494 - Iter 180/1891, heatmap Loss=0.0503, Loss=0.0503
+2026-01-26 17:48:40,912 - Iter 190/1891, heatmap Loss=0.0486, Loss=0.0486
+2026-01-26 17:48:53,434 - Iter 200/1891, heatmap Loss=0.0528, Loss=0.0528
+2026-01-26 17:49:05,786 - Iter 210/1891, heatmap Loss=0.0488, Loss=0.0488
+2026-01-26 17:49:18,196 - Iter 220/1891, heatmap Loss=0.0535, Loss=0.0535
+2026-01-26 17:49:30,858 - Iter 230/1891, heatmap Loss=0.0495, Loss=0.0495
+2026-01-26 17:49:43,024 - Iter 240/1891, heatmap Loss=0.0536, Loss=0.0536
+2026-01-26 17:49:55,464 - Iter 250/1891, heatmap Loss=0.0475, Loss=0.0475
+2026-01-26 17:50:07,629 - Iter 260/1891, heatmap Loss=0.0455, Loss=0.0455
+2026-01-26 17:50:20,358 - Iter 270/1891, heatmap Loss=0.0501, Loss=0.0501
+2026-01-26 17:50:32,829 - Iter 280/1891, heatmap Loss=0.0437, Loss=0.0437
+2026-01-26 17:50:45,687 - Iter 290/1891, heatmap Loss=0.0490, Loss=0.0490
+2026-01-26 17:50:57,832 - Iter 300/1891, heatmap Loss=0.0561, Loss=0.0561
+2026-01-26 17:51:10,110 - Iter 310/1891, heatmap Loss=0.0483, Loss=0.0483
+2026-01-26 17:51:22,786 - Iter 320/1891, heatmap Loss=0.0491, Loss=0.0491
+2026-01-26 17:51:35,595 - Iter 330/1891, heatmap Loss=0.0487, Loss=0.0487
+2026-01-26 17:51:47,790 - Iter 340/1891, heatmap Loss=0.0484, Loss=0.0484
+2026-01-26 17:51:59,782 - Iter 350/1891, heatmap Loss=0.0507, Loss=0.0507
+2026-01-26 17:52:12,375 - Iter 360/1891, heatmap Loss=0.0493, Loss=0.0493
+2026-01-26 17:52:24,768 - Iter 370/1891, heatmap Loss=0.0465, Loss=0.0465
+2026-01-26 17:52:37,376 - Iter 380/1891, heatmap Loss=0.0505, Loss=0.0505
+2026-01-26 17:52:49,890 - Iter 390/1891, heatmap Loss=0.0497, Loss=0.0497
+2026-01-26 17:53:02,738 - Iter 400/1891, heatmap Loss=0.0486, Loss=0.0486
+2026-01-26 17:53:15,295 - Iter 410/1891, heatmap Loss=0.0510, Loss=0.0510
+2026-01-26 17:53:27,335 - Iter 420/1891, heatmap Loss=0.0515, Loss=0.0515
+2026-01-26 17:53:39,347 - Iter 430/1891, heatmap Loss=0.0487, Loss=0.0487

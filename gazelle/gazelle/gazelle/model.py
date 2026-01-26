@@ -9,7 +9,7 @@ import gazelle.utils as utils
 import torch.nn.functional as F
 
 class GazeLLE(nn.Module):
-    def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64), is_multi_output=False, is_sam_prompt=False):
+    def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64), is_multi_output=False, is_sam_prompt=False, is_mix_gaze_estimation=False):
         super().__init__()
         self.backbone = backbone
         self.dim = dim
@@ -19,6 +19,7 @@ class GazeLLE(nn.Module):
         self.in_size = in_size
         self.out_size = out_size
         self.is_sam_prompt = is_sam_prompt
+        self.is_mix_gaze_estimation = is_mix_gaze_estimation
 
         # 获取 Backbone 输出特征图尺寸
         self.featmap_h, self.featmap_w = backbone.get_out_size(in_size)
@@ -47,6 +48,15 @@ class GazeLLE(nn.Module):
         # Legacy Support: 如果不是 SAM Backbone，还需要旧的 Head Token
         if not is_sam_prompt:
             self.head_token = nn.Embedding(1, self.dim)
+
+        if self.is_mix_gaze_estimation:
+            self.gaze3d_token = nn.Embedding(1, self.dim)
+            self.gaze3d_head = nn.Sequential(
+                nn.Linear(self.dim, 128),
+                nn.ReLU(),
+                nn.Dropout(0.1),
+                nn.Linear(128, 2) # 输出 [Yaw, Pitch]
+            )
 
         # 4. 核心融合层: Standard Transformer (Self-Attention)
         # 替代了 SAM 的 Two-Way Transformer
@@ -167,6 +177,9 @@ class GazeLLE(nn.Module):
         # 拼接所有 Token: [Special..., Prompts..., Image...]
         # Image 放在最后
         tokens_to_concat.append(x_flat)
+        if self.is_mix_gaze_estimation:
+            gaze3d_token_vec = self.gaze3d_token.weight.unsqueeze(0).repeat(x.shape[0], 1, 1)
+            tokens_to_concat.append(gaze3d_token_vec)
         x_input = torch.cat(tokens_to_concat, dim=1)
         
         # 5. Standard Transformer 全局交互
@@ -177,7 +190,7 @@ class GazeLLE(nn.Module):
         current_idx = 0
         output_dict = {
             "heatmap": None, "inout": None, 
-            "seg": None, "direction": None, "text_loss": None
+            "seg": None, "direction": None, "text_loss": None, "gaze3d": None
         }
 
         # [Decode] InOut
@@ -204,6 +217,12 @@ class GazeLLE(nn.Module):
                 fusion_feat=text_token_vec, 
                 target_ids=input.get("gaze_point_expression_ids")
             )
+
+        if self.is_mix_gaze_estimation:
+            gaze3d_token_vec = x_out[:, current_idx, :]
+            gaze3d_val = self.gaze3d_head(gaze3d_token_vec)
+            output_dict["gaze3d"] = utils.split_tensors(gaze3d_val, num_ppl_per_img)
+            current_idx += 1
 
         # [Skip] Prompts
         # 如果是 SAM backbone, 跳过 sparse_embeddings 的长度
