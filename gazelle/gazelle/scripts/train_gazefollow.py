@@ -122,10 +122,16 @@ def setup_logger(log_file):
     logger = logging.getLogger('gazelle_logger')
     logger.setLevel(logging.INFO)
     if not logger.handlers:
+        # 1. 文件输出
         fh = logging.FileHandler(log_file, mode='w')
         formatter = logging.Formatter('%(asctime)s - %(message)s')
         fh.setFormatter(formatter)
         logger.addHandler(fh)
+        
+        # 2. 【新增】屏幕/终端输出
+        sh = logging.StreamHandler()
+        sh.setFormatter(formatter)
+        logger.addHandler(sh)
     return logger
 
 def main():

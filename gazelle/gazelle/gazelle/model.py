@@ -24,8 +24,6 @@ class GazeLLE(nn.Module):
         self.featmap_h, self.featmap_w = backbone.get_out_size(in_size)
 
         # 1. 检查能力: 是否支持 Prompt Encoder (即是否为 SAM 系列 Backbone)
-        # 输出backbone有哪些属性
-        print(backbone.__dict__)
         if is_sam_prompt:
           if not hasattr(backbone, 'prompt_encoder'):
             raise ValueError("SAM Prompt Backbone must have prompt encoder")

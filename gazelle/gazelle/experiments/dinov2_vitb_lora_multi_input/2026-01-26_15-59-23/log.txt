@@ -1,0 +1,1 @@
+2026-01-26 15:59:23,215 - Experiment Config: {'model': 'dinov2_vitb_lora_multi_input', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'ckpt_save_dir': './experiments', 'wandb_project': 'dinov2_vitb_lora_multi_input', 'exp_name': 'dinov2_vitb_lora_multi_input', 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
