@@ -1,84 +1,58 @@
 import torch
 import torch.nn as nn
 import torchvision
-from timm.models.vision_transformer import Block
-import math
-import os
-from gazelle.backbone import DinoV2Backbone, SAMBackboneWrapper, SAMImageEncoder, GazeTextDecoder
 import gazelle.utils as utils
 import torch.nn.functional as F
 
 class GazeLLE(nn.Module):
-    def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64), is_multi_output=False):
+    def __init__(self, backbone, inout=False, dim=256, in_size=(448, 448), out_size=(64, 64), is_multi_output=False):
         super().__init__()
         self.backbone = backbone
         self.dim = dim
-        self.num_layers = num_layers
-        self.is_multi_output = is_multi_output
-
-        self.featmap_h, self.featmap_w = backbone.get_out_size(in_size)
-        
         self.in_size = in_size
         self.out_size = out_size
         self.inout = inout
         
-        # 必须是 SAM Backbone 才有 fusion 模块
+        # 必须确保是 SAM Backbone 且包含 fusion 模块
         self.is_sam = getattr(backbone, 'is_sam', False)
-        assert self.is_sam, "Step 2 需要使用 SAM Backbone 及其 Fusion 模块"
+        assert self.is_sam, "Step 3 strictly requires SAM Backbone"
 
         # 基础投影
         self.linear = nn.Conv2d(backbone.get_dimension(), self.dim, 1)
-        self.register_buffer("pos_embed", positionalencoding2d(self.dim, self.featmap_h, self.featmap_w))
+        
+        # 这里不需要显式 self.pos_embed，因为 SAMFusion 内部处理了
 
-        # ====================================================
-        # Step 2 修改：恢复 SAM 的 Tokens 定义，但保持 Deconv 输出头
-        # ====================================================
-
-        # 1. 恢复 Output Tokens (Learnable Queries)
-        # 因为 SAM 的 Fusion 需要 (Image, Tokens) 作为输入
-        # 我们这里暂时只初始化 1 个 token (heatmap)，忽略 inout 的复杂情况以简化消融
-        self.num_output_tokens = 1 
+        # ==========================================
+        # Step 3: 完整的 SAM Token 系统
+        # ==========================================
+        
+        # 定义 Token 索引指针
+        self.idx_heatmap = 0
+        self.idx_inout = 1 if inout else -1
+        
+        # 初始化 Tokens: [Heatmap, (Optional InOut)]
+        self.num_output_tokens = 2 if self.inout else 1
         self.output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
-        
-        # 2. 【移除】Standard Transformer
-        # self.transformer = ... (已移除)
 
-        # 3. 【保持】Standard Deconv Head
-        # 我们尝试直接解码 Fusion 输出的 Image Features (src)
-        self.heatmap_head = nn.Sequential(
-            nn.ConvTranspose2d(dim, dim, kernel_size=2, stride=2),
-            nn.Conv2d(dim, 1, kernel_size=1, bias=False),
-            nn.Sigmoid()
-        )
-        
-        # Inout Head (如果需要测试 inout 任务)
-        if self.inout: 
+        # InOut 分类头 (基于 Token)
+        if self.inout:
              self.inout_head = nn.Sequential(
-                nn.Linear(self.dim, 128),
-                nn.ReLU(),
-                nn.Dropout(0.1),
-                nn.Linear(128, 1),
-                nn.Sigmoid()
+                nn.Linear(self.dim, 128), nn.ReLU(), nn.Dropout(0.1),
+                nn.Linear(128, 1), nn.Sigmoid()
             )
+
+        # 注意：不再定义 self.heatmap_head (Deconv)
+        # 我们将直接使用 self.backbone.fusion.output_hypernetworks_mlps
 
     def forward(self, input):
         num_ppl_per_img = [len(bbox_list) for bbox_list in input["bboxes"]]
         
-        # 1. 提取基础图像特征
+        # 1. Image Features
         x = self.backbone.forward(input["images"])
-        
-        # 投影并加上位置编码 (SAM Fusion 内部通常也会加位置编码，但这里为了控制变量，我们先在外面处理好维度)
-        if x.shape[1] != self.dim:
-            x = self.linear(x)
-        
-        # 扩展到 Person 维度 [Total_People, dim, H, W]
-        x = utils.repeat_tensors(x, num_ppl_per_img)
-        
-        # ==========================================
-        #       Step 2: 准备 SAM Tokens & Fusion
-        # ==========================================
-        
-        # A. 准备 Prompts (Step 1 验证过没问题)
+        if x.shape[1] != self.dim: x = self.linear(x)
+        x = utils.repeat_tensors(x, num_ppl_per_img) # [Total_People, 256, 32, 32]
+
+        # 2. Prompt Encoder
         flat_bboxes = []
         for bbox_list in input["bboxes"]:
             for bbox in bbox_list:
@@ -94,53 +68,60 @@ class GazeLLE(nn.Module):
         bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
         eyes_tensor = torch.tensor(flat_eyes, device=x.device, dtype=torch.float32)
         
-        # B. Sparse Embeddings
+        # 获取 Sparse Embeddings [Total, N_prompts, 256]
         sparse_embeddings = self.backbone.prompt_encoder(
             bboxes_tensor, device=x.device, eyes=eyes_tensor, 
             expr_ids=input.get("observer_expression_ids", None)
         )
         
-        # C. 拼接 Tokens: [Learnable_Token, Prompt_Tokens]
-        # output_tokens: [1, 1, dim] -> [Total_People, 1, dim]
+        # 3. Concatenate Tokens
+        # tokens: [Total, Num_Learnable, 256]
         tokens = self.output_tokens.weight.unsqueeze(0).repeat(x.shape[0], 1, 1)
+        # 拼接顺序: [Heatmap_Token, InOut_Token(可选), Prompt_Tokens...]
         tokens = torch.cat((tokens, sparse_embeddings), dim=1)
 
-        # D. 【关键点】Two-Way Fusion
-        # 输入: x (Image), tokens (Prompts)
-        # 输出: hs (更新后的Tokens), src (更新后的Image)
-        # 这里的 src 经过了 "Image-to-Token" 的 Cross-Attention，理论上应该感知到了 Token 的位置信息
+        # 4. Two-Way Fusion (内部会自动加 PE)
+        # hs: [Total, All_Tokens, 256]
+        # src: [Total, 256, 32, 32] (这里的 src 缺乏 pixel-SA，适合 DotProduct，不适合 Deconv)
         hs, src = self.backbone.fusion(image_embeddings=x, tokens=tokens)
 
-        # ==========================================
-        #       Step 2: 使用 Deconv Head 解码
-        # ==========================================
+        # 5. 解码逻辑 (Hypernetwork + Dot Product)
         
-        # 我们这里做一个重要的假设测试：
-        # 如果 Fusion 工作正常，src (图像特征) 应该被 tokens (Prompt) "激活" 了相关区域。
-        # 我们直接把 src 扔进 Deconv 头，看看能不能解出 Heatmap。
+        # A. 提取对应的 Token
+        heatmap_token = hs[:, self.idx_heatmap, :] # [Total, 256]
         
-        # src shape: [Total_People, dim, H, W]
+        # B. 上采样图像特征 (SAM 的 output_upscaling 层)
+        # src [B, 256, 32, 32] -> [B, 32, 128, 128] (通道减少，尺寸变大)
+        src_upscaled = self.backbone.fusion.output_upscaling(src)
         
-        heatmap = self.heatmap_head(src)
+        # C. 通过 MLP 生成权重 (Hypernetwork)
+        # 使用第 0 个 MLP 对应 heatmap token
+        # output_hypernetworks_mlps 是一个 ModuleList
+        heatmap_mlp = self.backbone.fusion.output_hypernetworks_mlps[0] 
+        hyper_weight = heatmap_mlp(heatmap_token) # [Total, 32] (维度通常对应 src_upscaled 的通道数)
         
-        heatmap = torchvision.transforms.functional.resize(heatmap, self.out_size)
-        heatmap = heatmap.squeeze(1)
+        # D. Dot Product (点积生成 Mask)
+        b, c, h, w = src_upscaled.shape
+        # [B, 1, C] @ [B, C, H*W] -> [B, 1, H*W]
+        masks = (hyper_weight.unsqueeze(1) @ src_upscaled.view(b, c, h * w))
+        masks = masks.view(b, 1, h, w) # [Total, 1, 128, 128]
+        
+        # E. 后处理
+        if masks.shape[-2:] != self.out_size:
+            masks = F.interpolate(masks, size=self.out_size, mode='bilinear', align_corners=False)
+        
+        heatmap = torch.sigmoid(masks).squeeze(1)
         heatmap_preds = utils.split_tensors(heatmap, num_ppl_per_img)
 
-        # InOut 逻辑 (简化处理，如果有的话)
+        # 6. InOut 预测 (直接用 Token 预测，不做 Dot Product)
         inout_preds = None
         if self.inout:
-             # 简单地对 src 进行 Global Average Pooling 来预测 inout，或者使用 hs 里的 token
-             # 为了避免引入复杂变量，这里可以使用 hs 的第一个 token (learnable token)
-             inout_token_out = hs[:, 0, :]
+             inout_token_out = hs[:, self.idx_inout, :]
              inout_preds_flat = self.inout_head(inout_token_out).squeeze(dim=-1)
              inout_preds = utils.split_tensors(inout_preds_flat, num_ppl_per_img)
 
-        return {"heatmap": heatmap_preds, 
-                "inout": inout_preds,
-                "seg": None,
-                "direction": None,
-                "text_loss": None}
+        return {"heatmap": heatmap_preds, "inout": inout_preds, 
+                "seg": None, "direction": None, "text_loss": None}
 
     # ... (辅助函数保持不变) ...
     def get_input_head_maps(self, bboxes):
