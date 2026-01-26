@@ -25,7 +25,7 @@ def load_data_gazefollow(file):
 
 
 class GazeDataset(torch.utils.data.dataset.Dataset):
-    def __init__(self, dataset_name, path, split, transform, in_frame_only=True, sample_rate=1):
+    def __init__(self, dataset_name, path, split, transform, in_frame_only=True, sample_rate=1, is_mix_gaze_estimation=False):
         self.dataset_name = dataset_name
         self.path = path
         self.split = split
@@ -35,6 +35,7 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
         self.sample_rate = sample_rate
         self.expr_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         self.expr_tokenizer.pad_token = self.expr_tokenizer.eos_token
+        self.is_mix_gaze_estimation = is_mix_gaze_estimation and self.split == "train"
         
         if dataset_name == "gazefollow":
             self.data = load_data_gazefollow(os.path.join(self.path, "{}_preprocessed.json".format(split)))
@@ -105,23 +106,65 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
         img = img.convert("RGB")
         width, height = img.size
 
+        is_face_crop_mode = False
+
         if self.aug:
-            bbox = head_data['bbox']
-            gazex = head_data['gazex']
-            gazey = head_data['gazey']
+            if self.is_mix_gaze_estimation and np.random.sample() <= 0.2:
+                is_face_crop_mode = True
+                
+                raw_bbox = head_data['bbox'] # [xmin, ymin, xmax, ymax]
+                
+                # Random scale factor for cropping (0.8x to 1.5x of face size)
+                scale = np.random.uniform(0.8, 1.5)
+                
+                # Calculate center and new dimensions
+                b_w = raw_bbox[2] - raw_bbox[0]
+                b_h = raw_bbox[3] - raw_bbox[1]
+                cx = raw_bbox[0] + b_w / 2
+                cy = raw_bbox[1] + b_h / 2
+                
+                new_w = b_w * scale
+                new_h = b_h * scale
+                
+                # Calculate crop coordinates
+                crop_x1 = max(0, int(cx - new_w / 2))
+                crop_y1 = max(0, int(cy - new_h / 2))
+                crop_x2 = min(width, int(cx + new_w / 2))
+                crop_y2 = min(height, int(cy + new_h / 2))
+                
+                # Perform Crop
+                img = img.crop((crop_x1, crop_y1, crop_x2, crop_y2))
+                width, height = img.size # Update dimensions
+                
+                # 1. Update BBox Norm: Full image [0,0,1,1]
+                bbox_norm = [0.0, 0.0, 1.0, 1.0]
+                
+                # 2. Update Eyes: Approx center [0.5, 0.5]
+                if eye_norm is not None:
+                    eye_norm = [0.5, 0.5]
+                
+                # 3. Update Text: Override description
+                observer_expression = np.random.choice([
+                    "a close-up of a human face", "the face of a person",
+                    "head pose and gaze direction", "a cropped face image"
+                ])
+            else:
+                bbox = head_data['bbox']
+                gazex = head_data['gazex']
+                gazey = head_data['gazey']
 
-            if np.random.sample() <= 0.5:
-                img, bbox, gazex, gazey = utils.random_crop(img, bbox, gazex, gazey, inout)
-            if np.random.sample() <= 0.5:
-                img, bbox, gazex, gazey = utils.horiz_flip(img, bbox, gazex, gazey, inout)
-            if np.random.sample() <= 0.5:
-                bbox = utils.random_bbox_jitter(img, bbox)
+                if np.random.sample() <= 0.5:
+                    img, bbox, gazex, gazey = utils.random_crop(img, bbox, gazex, gazey, inout)
+                if np.random.sample() <= 0.5:
+                    img, bbox, gazex, gazey = utils.horiz_flip(img, bbox, gazex, gazey, inout)
+                if np.random.sample() <= 0.5:
+                    bbox = utils.random_bbox_jitter(img, bbox)
 
-            # update width and height and re-normalize
-            width, height = img.size
-            bbox_norm = [bbox[0] / width, bbox[1] / height, bbox[2] / width, bbox[3] / height]
-            gazex_norm = [x / float(width) for x in gazex]
-            gazey_norm = [y / float(height) for y in gazey]
+                # update width and height and re-normalize
+                width, height = img.size
+                bbox_norm = [bbox[0] / width, bbox[1] / height, bbox[2] / width, bbox[3] / height]
+                gazex_norm = [x / float(width) for x in gazex]
+                gazey_norm = [y / float(height) for y in gazey]
         
         img = self.transform(img)
         
