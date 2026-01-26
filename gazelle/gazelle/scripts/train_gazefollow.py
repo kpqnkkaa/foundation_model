@@ -239,12 +239,13 @@ def main():
             else:
                  heatmap_preds = preds['heatmap'].squeeze(dim=1)
 
+            loss = torch.tensor(0.0, device=heatmap_preds.device)
             heatmap_loss = criterion_bce(heatmap_preds, heatmaps.cuda())
-            loss = heatmap_loss
+            loss += heatmap_loss
 
             if preds['text_loss'] is not None:
                 text_loss = preds['text_loss']
-                loss += text_loss*0.005*0
+                loss += text_loss*0.005
             else:
                 text_loss = None
             
