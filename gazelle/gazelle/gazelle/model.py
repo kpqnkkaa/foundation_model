@@ -357,7 +357,7 @@ def sam_prompt_dinov2_vitb_lora_multi_input():
     model = GazeLLE(backbone, inout=False)
     return model, transform
     
-def sam_dinov2_vitb_lora_multi_output_input():
+def sam_prompt_dinov2_vitb_lora_multi_output_input():
     backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=True)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False, is_multi_output=True)
