@@ -20,7 +20,7 @@ from gazelle.model import get_gazelle_model
 from gazelle.utils import gazefollow_auc, gazefollow_l2
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default="dinov2_vitb_multi_input")
+parser.add_argument('--model', type=str, default="dinov2_vitb_multi_output")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--ckpt_save_dir', type=str, default='./experiments')
 parser.add_argument('--wandb_project', type=str, default=None)
@@ -244,7 +244,7 @@ def main():
 
             if preds['text_loss'] is not None:
                 text_loss = preds['text_loss']
-                loss += text_loss * 0
+                loss += text_loss * 0.05
             else:
                 text_loss = None
             
@@ -254,7 +254,7 @@ def main():
                 else:
                     preds['seg'] = preds['seg'].squeeze(dim=1)
                 seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
-                loss += seg_loss*0
+                loss += seg_loss*1.0
             else:
                 seg_loss = None
 
@@ -264,7 +264,7 @@ def main():
                 else:
                     preds['direction'] = preds['direction'].squeeze(dim=1)
                 direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
-                loss += direction_loss*0
+                loss += direction_loss*0.2
             else:
                 direction_loss = None
 

@@ -1,6 +1,5 @@
 import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ['HF_HUB_OFFLINE'] = '1'
 from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
@@ -36,7 +35,11 @@ class Backbone(nn.Module, ABC):
 class DinoV2Backbone(Backbone):
     def __init__(self, model_name, is_lora=False, lora_r=8):
         super(DinoV2Backbone, self).__init__()
-        self.model = torch.hub.load('facebookresearch/dinov2', model_name)
+        hub_dir = os.path.join(torch.hub.get_dir(), 'facebookresearch_dinov2_main')
+        if os.path.exists(hub_dir):
+            self.model = torch.hub.load(hub_dir, model_name)
+        else:
+            self.model = torch.hub.load('facebookresearch/dinov2', model_name)
         for param in self.model.parameters():
             param.requires_grad = False
         
