@@ -241,14 +241,11 @@ def main():
 
             loss = torch.tensor(0.0, device=heatmap_preds.device)
             heatmap_loss = criterion_bce(heatmap_preds, heatmaps.cuda())
-            # is_face_crop_mode现在是bool类型的list，所以直接取反会报错先变成tensor
-            is_face_crop_mode = torch.tensor(is_face_crop_mode, device=heatmap_preds.device)
-            valid_mask = 1 - is_face_crop_mode
-            loss += heatmap_loss*valid_mask
+            loss += heatmap_loss
 
             if preds['text_loss'] is not None:
                 text_loss = preds['text_loss']
-                loss += text_loss*valid_mask*0.001
+                loss += text_loss*0.001
             else:
                 text_loss = None
             
@@ -258,7 +255,7 @@ def main():
                 else:
                     preds['seg'] = preds['seg'].squeeze(dim=1)
                 seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
-                loss += seg_loss*valid_mask*0.1
+                loss += seg_loss*0.1
             else:
                 seg_loss = None
 
