@@ -1,0 +1,36 @@
+2026-01-26 16:48:04,756 - Experiment Config: {'model': 'dinov2_vitb_multi_output', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'ckpt_save_dir': './experiments', 'wandb_project': 'dinov2_vitb_multi_output', 'exp_name': 'dinov2_vitb_multi_output', 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
+2026-01-26 16:48:11,282 - Learnable parameters: 7540840
+2026-01-26 16:48:18,035 - 
+[Epoch 0 Training]
+2026-01-26 16:48:23,664 - Iter 0/1891, Loss=0.7016, Text Loss=8.1314, Seg Loss=0.6828, Direction Loss=2.1584, Loss=0.7016
+2026-01-26 16:48:29,317 - Iter 10/1891, Loss=0.0721, Text Loss=8.0063, Seg Loss=0.6629, Direction Loss=2.1547, Loss=0.0721
+2026-01-26 16:48:34,386 - Iter 20/1891, Loss=0.0635, Text Loss=8.1700, Seg Loss=0.6760, Direction Loss=2.1466, Loss=0.0635
+2026-01-26 16:48:39,302 - Iter 30/1891, Loss=0.0593, Text Loss=8.2286, Seg Loss=0.6807, Direction Loss=2.0915, Loss=0.0593
+2026-01-26 16:48:44,444 - Iter 40/1891, Loss=0.0595, Text Loss=7.9575, Seg Loss=0.6807, Direction Loss=2.1609, Loss=0.0595
+2026-01-26 16:48:49,508 - Iter 50/1891, Loss=0.0580, Text Loss=8.0666, Seg Loss=0.6750, Direction Loss=2.1055, Loss=0.0580
+2026-01-26 16:48:54,988 - Iter 60/1891, Loss=0.0594, Text Loss=8.1687, Seg Loss=0.6804, Direction Loss=2.1051, Loss=0.0594
+2026-01-26 16:49:01,161 - Iter 70/1891, Loss=0.0600, Text Loss=8.0483, Seg Loss=0.6750, Direction Loss=2.1324, Loss=0.0600
+2026-01-26 16:49:06,496 - Iter 80/1891, Loss=0.0579, Text Loss=8.0730, Seg Loss=0.6785, Direction Loss=2.1282, Loss=0.0579
+2026-01-26 16:49:12,436 - Iter 90/1891, Loss=0.0602, Text Loss=7.8545, Seg Loss=0.6789, Direction Loss=2.1564, Loss=0.0602
+2026-01-26 16:49:18,722 - Iter 100/1891, Loss=0.0569, Text Loss=8.1552, Seg Loss=0.6758, Direction Loss=2.1445, Loss=0.0569
+2026-01-26 16:49:24,590 - Iter 110/1891, Loss=0.0561, Text Loss=7.8903, Seg Loss=0.6776, Direction Loss=2.2214, Loss=0.0561
+2026-01-26 16:49:29,994 - Iter 120/1891, Loss=0.0597, Text Loss=8.3130, Seg Loss=0.6778, Direction Loss=2.1302, Loss=0.0597
+2026-01-26 16:49:35,841 - Iter 130/1891, Loss=0.0547, Text Loss=7.8571, Seg Loss=0.6775, Direction Loss=2.1066, Loss=0.0547
+2026-01-26 16:49:41,220 - Iter 140/1891, Loss=0.0568, Text Loss=8.3541, Seg Loss=0.6772, Direction Loss=2.0641, Loss=0.0568
+2026-01-26 16:49:46,905 - Iter 150/1891, Loss=0.0558, Text Loss=8.0420, Seg Loss=0.6761, Direction Loss=2.0765, Loss=0.0558
+2026-01-26 16:49:52,498 - Iter 160/1891, Loss=0.0550, Text Loss=8.2375, Seg Loss=0.6753, Direction Loss=2.1514, Loss=0.0550
+2026-01-26 16:49:57,689 - Iter 170/1891, Loss=0.0564, Text Loss=7.8612, Seg Loss=0.6722, Direction Loss=2.1517, Loss=0.0564
+2026-01-26 16:50:03,380 - Iter 180/1891, Loss=0.0620, Text Loss=8.1022, Seg Loss=0.6635, Direction Loss=2.1468, Loss=0.0620
+2026-01-26 16:50:09,586 - Iter 190/1891, Loss=0.0547, Text Loss=7.8730, Seg Loss=0.6577, Direction Loss=2.1141, Loss=0.0547
+2026-01-26 16:50:14,790 - Iter 200/1891, Loss=0.0528, Text Loss=8.0807, Seg Loss=0.6699, Direction Loss=2.1102, Loss=0.0528
+2026-01-26 16:50:19,965 - Iter 210/1891, Loss=0.0551, Text Loss=8.2000, Seg Loss=0.6598, Direction Loss=2.0430, Loss=0.0551
+2026-01-26 16:50:25,876 - Iter 220/1891, Loss=0.0554, Text Loss=8.0434, Seg Loss=0.6589, Direction Loss=2.1037, Loss=0.0554
+2026-01-26 16:50:30,832 - Iter 230/1891, Loss=0.0564, Text Loss=8.0535, Seg Loss=0.6559, Direction Loss=2.1397, Loss=0.0564
+2026-01-26 16:50:36,175 - Iter 240/1891, Loss=0.0548, Text Loss=7.5898, Seg Loss=0.6703, Direction Loss=2.1547, Loss=0.0548
+2026-01-26 16:50:41,118 - Iter 250/1891, Loss=0.0528, Text Loss=7.7273, Seg Loss=0.6640, Direction Loss=2.0792, Loss=0.0528
+2026-01-26 16:50:46,157 - Iter 260/1891, Loss=0.0551, Text Loss=8.2368, Seg Loss=0.6761, Direction Loss=2.1418, Loss=0.0551
+2026-01-26 16:50:51,386 - Iter 270/1891, Loss=0.0518, Text Loss=8.0003, Seg Loss=0.6713, Direction Loss=2.1552, Loss=0.0518
+2026-01-26 16:50:56,580 - Iter 280/1891, Loss=0.0553, Text Loss=7.8935, Seg Loss=0.6517, Direction Loss=2.1492, Loss=0.0553
+2026-01-26 16:51:02,321 - Iter 290/1891, Loss=0.0559, Text Loss=7.9863, Seg Loss=0.6705, Direction Loss=2.0568, Loss=0.0559
+2026-01-26 16:51:07,819 - Iter 300/1891, Loss=0.0558, Text Loss=8.0365, Seg Loss=0.6596, Direction Loss=2.0838, Loss=0.0558
+2026-01-26 16:51:13,191 - Iter 310/1891, Loss=0.0540, Text Loss=8.0647, Seg Loss=0.6456, Direction Loss=2.1102, Loss=0.0540

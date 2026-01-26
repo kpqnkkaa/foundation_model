@@ -244,7 +244,7 @@ def main():
 
             if preds['text_loss'] is not None:
                 text_loss = preds['text_loss']
-                loss += text_loss * 0.005
+                loss += text_loss*0.005*0
             else:
                 text_loss = None
             
@@ -254,7 +254,7 @@ def main():
                 else:
                     preds['seg'] = preds['seg'].squeeze(dim=1)
                 seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
-                loss += seg_loss*0.1
+                loss += seg_loss*0.1*0
             else:
                 seg_loss = None
 
@@ -264,7 +264,7 @@ def main():
                 else:
                     preds['direction'] = preds['direction'].squeeze(dim=1)
                 direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
-                loss += direction_loss*0.02
+                loss += direction_loss*0.02*0
             else:
                 direction_loss = None
 
@@ -281,10 +281,10 @@ def main():
             if cur_iter % args.log_iter == 0:
                 if text_loss is not None:
                     wandb.log({"train/heatmap_loss": heatmap_loss.item(), "train/text_loss": text_loss.item(), "train/seg_loss": seg_loss.item(), "train/direction_loss": direction_loss.item(), "train/loss": loss.item()})
-                    logger.info(f"Iter {cur_iter}/{len(train_dl)}, Loss={heatmap_loss.item():.4f}, Text Loss={text_loss.item():.4f}, Seg Loss={seg_loss.item():.4f}, Direction Loss={direction_loss.item():.4f}, Loss={loss.item():.4f}")
+                    logger.info(f"Iter {cur_iter}/{len(train_dl)}, heatmap Loss={heatmap_loss.item():.4f}, Text Loss={text_loss.item():.4f}, Seg Loss={seg_loss.item():.4f}, Direction Loss={direction_loss.item():.4f}, Loss={loss.item():.4f}")
                 else:
                     wandb.log({"train/heatmap_loss": heatmap_loss.item(), "train/loss": loss.item()})
-                    logger.info(f"Iter {cur_iter}/{len(train_dl)}, Loss={heatmap_loss.item():.4f}, Loss={loss.item():.4f}")
+                    logger.info(f"Iter {cur_iter}/{len(train_dl)}, heatmap Loss={heatmap_loss.item():.4f}, Loss={loss.item():.4f}")
         scheduler.step()
         avg_train_loss = np.mean(epoch_losses)
         logger.info(f"End of Epoch {epoch} Train - Avg Loss: {avg_train_loss:.4f}")
