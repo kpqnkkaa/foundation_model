@@ -2950,3 +2950,5 @@
 2026-01-26 22:51:07,238 - End of Epoch 14 Train - Avg Loss: 0.0406
 2026-01-26 22:51:08,663 - Saved last checkpoint to ./experiments/dinov2_vitb_multi_input/2026-01-26_16-29-03/last.pt
 2026-01-26 22:51:08,664 - [Epoch 14 Evaluation]
+2026-01-26 22:55:48,338 - EVAL EPOCH 14: AUC=0.9554, Min L2=0.047, Avg L2=0.1054
+2026-01-26 22:55:48,339 - Completed training. Best Min L2 of 0.0467 obtained at epoch 10
