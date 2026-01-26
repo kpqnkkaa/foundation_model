@@ -8,6 +8,9 @@ import torch.nn as nn
 import wandb
 import logging
 from tqdm import tqdm
+import cv2
+cv2.setNumThreads(0) # 禁止 OpenCV 多线程，防止死锁
+cv2.ocl.setUseOpenCL(False)
 
 # 1. 强制设置可见显卡为 2, 3
 os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
@@ -241,7 +244,7 @@ def main():
 
             if preds['text_loss'] is not None:
                 text_loss = preds['text_loss']
-                loss += text_loss
+                loss += text_loss * 0
             else:
                 text_loss = None
             
@@ -251,7 +254,7 @@ def main():
                 else:
                     preds['seg'] = preds['seg'].squeeze(dim=1)
                 seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
-                loss += seg_loss
+                loss += seg_loss*0
             else:
                 seg_loss = None
 
@@ -261,7 +264,7 @@ def main():
                 else:
                     preds['direction'] = preds['direction'].squeeze(dim=1)
                 direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
-                loss += direction_loss
+                loss += direction_loss*0
             else:
                 direction_loss = None
 
