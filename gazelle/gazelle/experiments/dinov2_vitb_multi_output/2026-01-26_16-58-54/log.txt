@@ -1,0 +1,18 @@
+2026-01-26 16:58:54,512 - Experiment Config: {'model': 'dinov2_vitb_multi_output', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'ckpt_save_dir': './experiments', 'wandb_project': 'dinov2_vitb_multi_output', 'exp_name': 'dinov2_vitb_multi_output', 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
+2026-01-26 16:59:01,831 - Learnable parameters: 7540840
+2026-01-26 16:59:08,932 - 
+[Epoch 0 Training]
+2026-01-26 16:59:13,768 - Iter 0/1891, heatmap Loss=0.7423, Text Loss=8.1314, Seg Loss=0.6828, Direction Loss=2.1584, Loss=0.7423
+2026-01-26 16:59:20,997 - Iter 10/1891, heatmap Loss=0.0998, Text Loss=5.4516, Seg Loss=0.6582, Direction Loss=2.1456, Loss=0.0998
+2026-01-26 16:59:27,497 - Iter 20/1891, heatmap Loss=0.0850, Text Loss=4.3294, Seg Loss=0.6736, Direction Loss=2.1429, Loss=0.0850
+2026-01-26 16:59:34,327 - Iter 30/1891, heatmap Loss=0.0790, Text Loss=3.9634, Seg Loss=0.6873, Direction Loss=2.0919, Loss=0.0790
+2026-01-26 16:59:41,389 - Iter 40/1891, heatmap Loss=0.0783, Text Loss=3.7265, Seg Loss=0.6881, Direction Loss=2.1595, Loss=0.0783
+2026-01-26 16:59:48,014 - Iter 50/1891, heatmap Loss=0.0771, Text Loss=3.7920, Seg Loss=0.6794, Direction Loss=2.0986, Loss=0.0771
+2026-01-26 16:59:54,654 - Iter 60/1891, heatmap Loss=0.0763, Text Loss=3.3752, Seg Loss=0.6812, Direction Loss=2.0991, Loss=0.0763
+2026-01-26 17:00:01,564 - Iter 70/1891, heatmap Loss=0.0737, Text Loss=2.7438, Seg Loss=0.6753, Direction Loss=2.1251, Loss=0.0737
+2026-01-26 17:00:08,648 - Iter 80/1891, heatmap Loss=0.0699, Text Loss=2.4104, Seg Loss=0.6796, Direction Loss=2.1284, Loss=0.0699
+2026-01-26 17:00:15,107 - Iter 90/1891, heatmap Loss=0.0718, Text Loss=2.3374, Seg Loss=0.6797, Direction Loss=2.1556, Loss=0.0718
+2026-01-26 17:00:21,671 - Iter 100/1891, heatmap Loss=0.0677, Text Loss=2.1512, Seg Loss=0.6757, Direction Loss=2.1452, Loss=0.0677
+2026-01-26 17:00:28,757 - Iter 110/1891, heatmap Loss=0.0676, Text Loss=2.2915, Seg Loss=0.6766, Direction Loss=2.2164, Loss=0.0676
+2026-01-26 17:00:35,509 - Iter 120/1891, heatmap Loss=0.0695, Text Loss=1.9474, Seg Loss=0.6770, Direction Loss=2.1219, Loss=0.0695
+2026-01-26 17:00:41,978 - Iter 130/1891, heatmap Loss=0.0652, Text Loss=2.0891, Seg Loss=0.6751, Direction Loss=2.1019, Loss=0.0652

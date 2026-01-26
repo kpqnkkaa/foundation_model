@@ -204,11 +204,6 @@ class GazeLLE(nn.Module):
                 fusion_feat=text_token_vec, 
                 target_ids=input.get("gaze_point_expression_ids")
             )
-            
-            # Seg (Pass to image decoding phase or decode here if strictly token based? 
-            # In standard ViT, dense pred usually comes from image features, 
-            # but we can condition it. For simplicity, we use separate head on image features below)
-            pass 
 
         # [Skip] Prompts
         # 如果是 SAM backbone, 跳过 sparse_embeddings 的长度
@@ -299,7 +294,8 @@ def get_gazelle_model(model_name):
         "sam_vitb": sam_vitb,
         "dinov2_vitb_lora": dinov2_vitb_lora,
         "dinov2_vitb_multi_input": dinov2_vitb_multi_input,
-        "dinov2_vitb_multi_output": dinov2_vitb_multi_output
+        "dinov2_vitb_multi_output": dinov2_vitb_multi_output,
+        "dinov2_vitb_lora_multi_output": dinov2_vitb_lora_multi_output
     }
     assert model_name in factory.keys(), "invalid model name"
     return factory[model_name]()
@@ -348,6 +344,12 @@ def dinov2_vitb_multi_input():
     
 def dinov2_vitb_multi_output():
     backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=False, is_multi_input=False,)
+    transform = backbone.get_transform((448, 448))
+    model = GazeLLE(backbone, inout=False, is_multi_output=True, is_sam_prompt=False)
+    return model, transform
+
+def dinov2_vitb_lora_multi_output():
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=False,)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False, is_multi_output=True, is_sam_prompt=False)
     return model, transform

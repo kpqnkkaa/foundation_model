@@ -1,1 +1,16 @@
 2026-01-26 16:57:09,523 - Experiment Config: {'model': 'dinov2_vitb_multi_output', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'ckpt_save_dir': './experiments', 'wandb_project': 'dinov2_vitb_multi_output', 'exp_name': 'dinov2_vitb_multi_output', 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
+2026-01-26 16:57:15,654 - Learnable parameters: 7540840
+2026-01-26 16:57:21,943 - 
+[Epoch 0 Training]
+2026-01-26 16:57:26,529 - Iter 0/1891, heatmap Loss=0.7016, Text Loss=8.1314, Seg Loss=0.6828, Direction Loss=2.1584, Loss=0.7016
+2026-01-26 16:57:33,400 - Iter 10/1891, heatmap Loss=0.0721, Text Loss=8.0063, Seg Loss=0.6629, Direction Loss=2.1547, Loss=0.0721
+2026-01-26 16:57:40,224 - Iter 20/1891, heatmap Loss=0.0635, Text Loss=8.1700, Seg Loss=0.6760, Direction Loss=2.1466, Loss=0.0635
+2026-01-26 16:57:47,183 - Iter 30/1891, heatmap Loss=0.0593, Text Loss=8.2286, Seg Loss=0.6807, Direction Loss=2.0915, Loss=0.0593
+2026-01-26 16:57:54,166 - Iter 40/1891, heatmap Loss=0.0595, Text Loss=7.9575, Seg Loss=0.6807, Direction Loss=2.1609, Loss=0.0595
+2026-01-26 16:58:00,812 - Iter 50/1891, heatmap Loss=0.0580, Text Loss=8.0666, Seg Loss=0.6750, Direction Loss=2.1055, Loss=0.0580
+2026-01-26 16:58:07,289 - Iter 60/1891, heatmap Loss=0.0594, Text Loss=8.1687, Seg Loss=0.6804, Direction Loss=2.1051, Loss=0.0594
+2026-01-26 16:58:14,653 - Iter 70/1891, heatmap Loss=0.0600, Text Loss=8.0483, Seg Loss=0.6750, Direction Loss=2.1324, Loss=0.0600
+2026-01-26 16:58:21,181 - Iter 80/1891, heatmap Loss=0.0579, Text Loss=8.0730, Seg Loss=0.6785, Direction Loss=2.1282, Loss=0.0579
+2026-01-26 16:58:27,407 - Iter 90/1891, heatmap Loss=0.0602, Text Loss=7.8545, Seg Loss=0.6789, Direction Loss=2.1564, Loss=0.0602
+2026-01-26 16:58:33,697 - Iter 100/1891, heatmap Loss=0.0569, Text Loss=8.1552, Seg Loss=0.6758, Direction Loss=2.1445, Loss=0.0569
+2026-01-26 16:58:39,947 - Iter 110/1891, heatmap Loss=0.0561, Text Loss=7.8903, Seg Loss=0.6776, Direction Loss=2.2214, Loss=0.0561

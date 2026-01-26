@@ -254,7 +254,7 @@ def main():
                 else:
                     preds['seg'] = preds['seg'].squeeze(dim=1)
                 seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
-                loss += seg_loss*0.1*0
+                loss += seg_loss*0.1
             else:
                 seg_loss = None
 
@@ -264,7 +264,7 @@ def main():
                 else:
                     preds['direction'] = preds['direction'].squeeze(dim=1)
                 direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
-                loss += direction_loss*0.02*0
+                loss += direction_loss*0.02
             else:
                 direction_loss = None
 
