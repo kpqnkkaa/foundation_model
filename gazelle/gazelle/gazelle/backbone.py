@@ -37,7 +37,7 @@ class DinoV2Backbone(Backbone):
         super(DinoV2Backbone, self).__init__()
         hub_dir = os.path.join(torch.hub.get_dir(), 'facebookresearch_dinov2_main')
         if os.path.exists(hub_dir):
-            self.model = torch.hub.load(hub_dir, model_name)
+            self.model = torch.hub.load(hub_dir, model_name, source='local')
         else:
             self.model = torch.hub.load('facebookresearch/dinov2', model_name)
         for param in self.model.parameters():

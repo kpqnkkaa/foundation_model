@@ -1,0 +1,14 @@
+2026-01-26 16:43:31,619 - Experiment Config: {'model': 'dinov2_vitb_multi_output', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'ckpt_save_dir': './experiments', 'wandb_project': 'dinov2_vitb_multi_output', 'exp_name': 'dinov2_vitb_multi_output', 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
+2026-01-26 16:43:37,873 - Learnable parameters: 7540840
+2026-01-26 16:43:43,654 - 
+[Epoch 0 Training]
+2026-01-26 16:43:48,787 - Iter 0/1891, Loss=0.8537, Text Loss=8.1314, Seg Loss=0.6828, Direction Loss=2.1584, Loss=0.8537
+2026-01-26 16:43:55,860 - Iter 10/1891, Loss=0.1639, Text Loss=5.8322, Seg Loss=0.2567, Direction Loss=1.7721, Loss=0.1639
+2026-01-26 16:44:03,281 - Iter 20/1891, Loss=0.1405, Text Loss=4.6487, Seg Loss=0.1749, Direction Loss=1.7291, Loss=0.1405
+2026-01-26 16:44:10,057 - Iter 30/1891, Loss=0.1283, Text Loss=4.1559, Seg Loss=0.1331, Direction Loss=1.7295, Loss=0.1283
+2026-01-26 16:44:17,238 - Iter 40/1891, Loss=0.1298, Text Loss=3.9110, Seg Loss=0.1305, Direction Loss=1.8125, Loss=0.1298
+2026-01-26 16:44:24,085 - Iter 50/1891, Loss=0.1226, Text Loss=3.9553, Seg Loss=0.1141, Direction Loss=1.6580, Loss=0.1226
+2026-01-26 16:44:31,035 - Iter 60/1891, Loss=0.1315, Text Loss=3.7383, Seg Loss=0.2213, Direction Loss=1.5575, Loss=0.1315
+2026-01-26 16:44:37,996 - Iter 70/1891, Loss=0.1186, Text Loss=3.3452, Seg Loss=0.1276, Direction Loss=1.4620, Loss=0.1186
+2026-01-26 16:44:45,647 - Iter 80/1891, Loss=0.1167, Text Loss=2.7303, Seg Loss=0.1672, Direction Loss=1.4123, Loss=0.1167
+2026-01-26 16:44:53,187 - Iter 90/1891, Loss=0.1195, Text Loss=2.4791, Seg Loss=0.1874, Direction Loss=1.4278, Loss=0.1195
