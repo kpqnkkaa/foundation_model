@@ -1,0 +1,8 @@
+2026-01-26 01:02:56,116 - Experiment Config: {'model': 'sam_dinov2_vitb_lora_multi_input', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'ckpt_save_dir': './experiments', 'wandb_project': 'sam_dinov2_vitb_lora_mult_input', 'exp_name': 'train_sam_dinov2_vitb_lora_multi_input', 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
+2026-01-26 01:05:11,349 - Learnable parameters: 7537632
+2026-01-26 01:05:17,291 - 
+[Epoch 0 Training]
+2026-01-26 01:05:20,643 - Iter 0/1891, Loss=0.6695, Loss=0.6695
+2026-01-26 01:05:29,790 - Iter 10/1891, Loss=0.0927, Loss=0.0927
+2026-01-26 01:05:38,811 - Iter 20/1891, Loss=0.0671, Loss=0.0671
+2026-01-26 01:05:47,948 - Iter 30/1891, Loss=0.0584, Loss=0.0584
