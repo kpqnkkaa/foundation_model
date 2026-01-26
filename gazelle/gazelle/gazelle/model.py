@@ -16,83 +16,44 @@ class GazeLLE(nn.Module):
         self.num_layers = num_layers
         self.is_multi_output = is_multi_output
 
-        # 获取 Backbone 输出特征图尺寸 (例如 448输入 -> 14x14 或 28x28)
         self.featmap_h, self.featmap_w = backbone.get_out_size(in_size)
         
         self.in_size = in_size
         self.out_size = out_size
         self.inout = inout
-
-        # 1. 判定是否为 SAM Backbone (用于保留调用 prompt_encoder 的能力，但不用于走 SAM 分支逻辑)
-        self.is_sam = getattr(backbone, 'is_sam', False)
-
-        # 2. 基础组件 (所有模式共用)
-        # 将 Backbone 特征 (如 DINOv2 的 768) 投影到模型维度 (256)
-        self.linear = nn.Conv2d(backbone.get_dimension(), self.dim, 1)
         
-        # 位置编码
+        # 必须是 SAM Backbone 才有 fusion 模块
+        self.is_sam = getattr(backbone, 'is_sam', False)
+        assert self.is_sam, "Step 2 需要使用 SAM Backbone 及其 Fusion 模块"
+
+        # 基础投影
+        self.linear = nn.Conv2d(backbone.get_dimension(), self.dim, 1)
         self.register_buffer("pos_embed", positionalencoding2d(self.dim, self.featmap_h, self.featmap_w))
 
-        # 3. 分支逻辑构建 - 【修改：强制走类似 Standard 的初始化，但不做 Head Map 的 embedding】
-        
-        # if self.is_sam:
-        #     # ================= SAM 分支初始化 (已注释) =================
-        #     # Tokens: 如果有 inout，则需要 2 个 token [InOut, Heatmap]，否则 1 个 [Heatmap]
-        #     self.num_output_tokens = 2 if self.inout else 1
-        #     self.output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
+        # ====================================================
+        # Step 2 修改：恢复 SAM 的 Tokens 定义，但保持 Deconv 输出头
+        # ====================================================
 
-        #     # 要输出分割，方向分类，expression的结果
-        #     if self.is_multi_output:
-        #         self.num_output_tokens = 3
-        #         self.multi_output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
-
-        #     # 注意：这里不再初始化 MLP，因为我们会直接使用 backbone.fusion 里的预训练 MLP
-
-        #     # InOut 分类头 (如果需要)
-        #     if self.inout:
-        #          self.inout_head = nn.Sequential(
-        #             nn.Linear(self.dim, 128),
-        #             nn.ReLU(),
-        #             nn.Dropout(0.1),
-        #             nn.Linear(128, 1),
-        #             nn.Sigmoid()
-        #         )
-        #     if self.is_multi_output:
-        #         # 8分类
-        #         self.direction_head = nn.Sequential(
-        #             nn.Linear(self.dim, 128),
-        #             nn.ReLU(),
-        #             nn.Dropout(0.1),
-        #             nn.Linear(128, 8)
-        #         )
-        #         self.text_head = GazeTextDecoder(input_dim=self.dim, model_name="gpt2", lora_r=8, max_len=25)
-
-        # else:
-        # ================= Standard 分支初始化 (修改版) =================
-        # self.head_token = nn.Embedding(1, self.dim) # 【移除】不再需要 Head Map 的 Token
+        # 1. 恢复 Output Tokens (Learnable Queries)
+        # 因为 SAM 的 Fusion 需要 (Image, Tokens) 作为输入
+        # 我们这里暂时只初始化 1 个 token (heatmap)，忽略 inout 的复杂情况以简化消融
+        self.num_output_tokens = 1 
+        self.output_tokens = nn.Embedding(self.num_output_tokens, self.dim)
         
-        if self.inout: 
-            self.inout_token = nn.Embedding(1, self.dim)
-        
-        # 标准 Transformer Decoder (Self-Attention)
-        self.transformer = nn.Sequential(*[
-            Block(
-                dim=self.dim, 
-                num_heads=8, 
-                mlp_ratio=4, 
-                drop_path=0.1)
-            for i in range(num_layers)
-        ])
-        
-        # 简单的反卷积头生成 Heatmap (Standard 方式)
+        # 2. 【移除】Standard Transformer
+        # self.transformer = ... (已移除)
+
+        # 3. 【保持】Standard Deconv Head
+        # 我们尝试直接解码 Fusion 输出的 Image Features (src)
         self.heatmap_head = nn.Sequential(
             nn.ConvTranspose2d(dim, dim, kernel_size=2, stride=2),
             nn.Conv2d(dim, 1, kernel_size=1, bias=False),
             nn.Sigmoid()
         )
         
+        # Inout Head (如果需要测试 inout 任务)
         if self.inout: 
-            self.inout_head = nn.Sequential(
+             self.inout_head = nn.Sequential(
                 nn.Linear(self.dim, 128),
                 nn.ReLU(),
                 nn.Dropout(0.1),
@@ -101,159 +62,89 @@ class GazeLLE(nn.Module):
             )
 
     def forward(self, input):
-        # input["images"]: [B, 3, H, W]
-        # input["bboxes"]: list of lists of bbox tuples (normalized 0-1)
-        
         num_ppl_per_img = [len(bbox_list) for bbox_list in input["bboxes"]]
         
-        # 1. 提取基础图像特征 [B, C, H, W]
+        # 1. 提取基础图像特征
         x = self.backbone.forward(input["images"])
         
-        heatmap_preds = []
-        inout_preds = None
-        seg_preds = None
-        direction_preds = None
-        text_preds = None
-
-        # ==========================================
-        #       SAM 逻辑分支 (已注释) -> 改为提取 Prompt 特征供下面使用
-        # ==========================================
-        # if self.is_sam:
-        #     # ... (原 SAM 逻辑)
-        #     pass 
-
-        # 【新增】即便走 Standard 流程，我们也在这里提取 SAM Prompt Embeddings
-        # 只有当 backbone 支持 prompt_encoder 时才执行 (假设你是用的 sam backbone 及其 wrapper)
-        if hasattr(self.backbone, 'prompt_encoder'):
-            # A. 准备 Prompts (将归一化 bbox 转为绝对坐标)
-            flat_bboxes = []
-            for bbox_list in input["bboxes"]:
-                for bbox in bbox_list:
-                    xmin, ymin, xmax, ymax = bbox
-                    flat_bboxes.append([
-                        xmin * self.in_size[1], 
-                        ymin * self.in_size[0], 
-                        xmax * self.in_size[1], 
-                        ymax * self.in_size[0]
-                    ])
-            flat_eyes = []
-            for eye in input["eyes"]:
-                flat_eyes.append([
-                    eye[0] * self.in_size[1],
-                    eye[1] * self.in_size[0]
-                ])
-            
-            # [Total_People, 4]
-            # 注意：如果 dim 还没变 (Linear层在后面)，这里需要处理 device 问题
-            bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
-            eyes_tensor = torch.tensor(flat_eyes, device=x.device, dtype=torch.float32)
-            
-            # B. 获取 Sparse Embeddings [Total_People, N_sparse, dim]
-            # 这些 Embedding 包含了位置信息
-            sparse_embeddings = self.backbone.prompt_encoder(
-                bboxes_tensor, 
-                device=x.device, 
-                eyes=eyes_tensor, 
-                expr_ids=input.get("observer_expression_ids", None)
-            )
-        else:
-            raise ValueError("当前消融实验需要 Backbone 具备 prompt_encoder 能力 (is_sam=True的backbone)，但走 Standard 流程。")
-
-
-        # ==========================================
-        #             Standard 逻辑分支 (修改版)
-        # ==========================================
-        # else:
-        
-        # 1. 图像特征投影 [B, dim, H, W]
+        # 投影并加上位置编码 (SAM Fusion 内部通常也会加位置编码，但这里为了控制变量，我们先在外面处理好维度)
         if x.shape[1] != self.dim:
-            x = self.linear(x) 
+            x = self.linear(x)
         
-        # 2. 加上位置编码
-        x = x + self.pos_embed
-        
-        # 3. 扩展到 Person 维度 [Total_People, dim, H, W]
+        # 扩展到 Person 维度 [Total_People, dim, H, W]
         x = utils.repeat_tensors(x, num_ppl_per_img)
+        
+        # ==========================================
+        #       Step 2: 准备 SAM Tokens & Fusion
+        # ==========================================
+        
+        # A. 准备 Prompts (Step 1 验证过没问题)
+        flat_bboxes = []
+        for bbox_list in input["bboxes"]:
+            for bbox in bbox_list:
+                xmin, ymin, xmax, ymax = bbox
+                flat_bboxes.append([
+                    xmin * self.in_size[1], ymin * self.in_size[0], 
+                    xmax * self.in_size[1], ymax * self.in_size[0]
+                ])
+        flat_eyes = []
+        for eye in input["eyes"]:
+            flat_eyes.append([eye[0] * self.in_size[1], eye[1] * self.in_size[0]])
+        
+        bboxes_tensor = torch.tensor(flat_bboxes, device=x.device, dtype=torch.float32)
+        eyes_tensor = torch.tensor(flat_eyes, device=x.device, dtype=torch.float32)
+        
+        # B. Sparse Embeddings
+        sparse_embeddings = self.backbone.prompt_encoder(
+            bboxes_tensor, device=x.device, eyes=eyes_tensor, 
+            expr_ids=input.get("observer_expression_ids", None)
+        )
+        
+        # C. 拼接 Tokens: [Learnable_Token, Prompt_Tokens]
+        # output_tokens: [1, 1, dim] -> [Total_People, 1, dim]
+        tokens = self.output_tokens.weight.unsqueeze(0).repeat(x.shape[0], 1, 1)
+        tokens = torch.cat((tokens, sparse_embeddings), dim=1)
 
-        # 【移除】 A. 叠加 Head Maps
-        # head_maps = torch.cat(self.get_input_head_maps(input["bboxes"]), dim=0).to(x.device) 
-        # head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
-        # x = x + head_map_embeddings
+        # D. 【关键点】Two-Way Fusion
+        # 输入: x (Image), tokens (Prompts)
+        # 输出: hs (更新后的Tokens), src (更新后的Image)
+        # 这里的 src 经过了 "Image-to-Token" 的 Cross-Attention，理论上应该感知到了 Token 的位置信息
+        hs, src = self.backbone.fusion(image_embeddings=x, tokens=tokens)
 
-        # B. Flatten 准备进入 Transformer
-        # "b c h w -> b (h w) c"
-        # [Total_People, H*W, dim]
-        x_flat = x.flatten(start_dim=2).permute(0, 2, 1)
+        # ==========================================
+        #       Step 2: 使用 Deconv Head 解码
+        # ==========================================
         
-        # 【新增】将 SAM 的 Prompt Embeddings 拼接到序列前面
-        # sparse_embeddings: [Total_People, N, dim]
-        # x_input: [Total_People, N + H*W, dim]
-        x_input = torch.cat([sparse_embeddings, x_flat], dim=1)
-
-        # 处理 InOut Token (如果有)
-        if self.inout:
-            inout_t = self.inout_token.weight.unsqueeze(dim=0).repeat(x_input.shape[0], 1, 1)
-            x_input = torch.cat([inout_t, x_input], dim=1)
+        # 我们这里做一个重要的假设测试：
+        # 如果 Fusion 工作正常，src (图像特征) 应该被 tokens (Prompt) "激活" 了相关区域。
+        # 我们直接把 src 扔进 Deconv 头，看看能不能解出 Heatmap。
         
-        # C. Transformer 交互 (Self-Attention)
-        # 这里的 Transformer 现在同时处理 Prompt 和 Image Tokens
-        x_out = self.transformer(x_input)
-
-        # D. 解码 InOut
-        current_idx = 0
-        if self.inout:
-            inout_tokens = x_out[:, 0, :] 
-            inout_preds_flat = self.inout_head(inout_tokens).squeeze(dim=-1)
-            inout_preds = utils.split_tensors(inout_preds_flat, num_ppl_per_img)
-            current_idx += 1 # 跳过 inout token
+        # src shape: [Total_People, dim, H, W]
         
-        # E. 解码 Heatmap
-        # 我们只取回原本图像部分的 Token
-        # sparse_embeddings 的长度
-        num_prompts = sparse_embeddings.shape[1]
-        
-        # 现在的序列结构是: [InOut(可选), Prompts(N), Image(H*W)]
-        # 我们要切出 Image 部分
-        start_img_idx = current_idx + num_prompts
-        x_img = x_out[:, start_img_idx:, :]
-        
-        # Reshape 回空间维度 [Total_People, dim, H, W]
-        x_img = x_img.permute(0, 2, 1).reshape(x_img.shape[0], self.dim, self.featmap_h, self.featmap_w)
-        
-        # 使用 Standard 的反卷积头
-        heatmap = self.heatmap_head(x_img)
+        heatmap = self.heatmap_head(src)
         
         heatmap = torchvision.transforms.functional.resize(heatmap, self.out_size)
         heatmap = heatmap.squeeze(1)
         heatmap_preds = utils.split_tensors(heatmap, num_ppl_per_img)
 
+        # InOut 逻辑 (简化处理，如果有的话)
+        inout_preds = None
+        if self.inout:
+             # 简单地对 src 进行 Global Average Pooling 来预测 inout，或者使用 hs 里的 token
+             # 为了避免引入复杂变量，这里可以使用 hs 的第一个 token (learnable token)
+             inout_token_out = hs[:, 0, :]
+             inout_preds_flat = self.inout_head(inout_token_out).squeeze(dim=-1)
+             inout_preds = utils.split_tensors(inout_preds_flat, num_ppl_per_img)
+
         return {"heatmap": heatmap_preds, 
                 "inout": inout_preds,
-                "seg": seg_preds,
-                "direction": direction_preds,
-                "text_loss": text_preds}
+                "seg": None,
+                "direction": None,
+                "text_loss": None}
 
-    # ... (get_input_head_maps 等函数保持不变或不再使用) ...
+    # ... (辅助函数保持不变) ...
     def get_input_head_maps(self, bboxes):
-        # bboxes: [[(xmin, ymin, xmax, ymax)]] - list of list of head bboxes per image
-        head_maps = []
-        for bbox_list in bboxes:
-            img_head_maps = []
-            for bbox in bbox_list:
-                if bbox is None: # no bbox provided, use empty head map
-                    img_head_maps.append(torch.zeros(self.featmap_h, self.featmap_w))
-                else:
-                    xmin, ymin, xmax, ymax = bbox
-                    width, height = self.featmap_w, self.featmap_h
-                    xmin = round(xmin * width)
-                    ymin = round(ymin * height)
-                    xmax = round(xmax * width)
-                    ymax = round(ymax * height)
-                    head_map = torch.zeros((height, width))
-                    head_map[ymin:ymax, xmin:xmax] = 1
-                    img_head_maps.append(head_map)
-            head_maps.append(torch.stack(img_head_maps))
-        return head_maps
+        return [] # 不再使用
     
     def get_gazelle_state_dict(self):
         return self.state_dict()
@@ -262,45 +153,23 @@ class GazeLLE(nn.Module):
         current_state_dict = self.state_dict()
         keys1 = current_state_dict.keys()
         keys2 = ckpt_state_dict.keys()
-
-        keys1 = set(keys1)
-        keys2 = set(keys2)
-
-        if len(keys2 - keys1) > 0:
-            print("WARNING unused keys in provided state dict: ", keys2 - keys1)
-        if len(keys1 - keys2) > 0:
-            print("WARNING provided state dict does not have values for keys: ", keys1 - keys2)
-
         for k in list(keys1 & keys2):
             current_state_dict[k] = ckpt_state_dict[k]
-        
         self.load_state_dict(current_state_dict, strict=False)
 
-# ... (positionalencoding2d 和模型工厂函数保持不变) ...
 def positionalencoding2d(d_model, height, width):
-    """
-    :param d_model: dimension of the model
-    :param height: height of the positions
-    :param width: width of the positions
-    :return: d_model*height*width position matrix
-    """
     if d_model % 4 != 0:
-        raise ValueError("Cannot use sin/cos positional encoding with "
-                         "odd dimension (got dim={:d})".format(d_model))
+        raise ValueError("Cannot use sin/cos positional encoding with odd dimension")
     pe = torch.zeros(d_model, height, width)
-    # Each dimension use half of d_model
     d_model = int(d_model / 2)
-    div_term = torch.exp(torch.arange(0., d_model, 2) *
-                         -(math.log(10000.0) / d_model))
+    div_term = torch.exp(torch.arange(0., d_model, 2) * -(math.log(10000.0) / d_model))
     pos_w = torch.arange(0., width).unsqueeze(1)
     pos_h = torch.arange(0., height).unsqueeze(1)
     pe[0:d_model:2, :, :] = torch.sin(pos_w * div_term).transpose(0, 1).unsqueeze(1).repeat(1, height, 1)
     pe[1:d_model:2, :, :] = torch.cos(pos_w * div_term).transpose(0, 1).unsqueeze(1).repeat(1, height, 1)
     pe[d_model::2, :, :] = torch.sin(pos_h * div_term).transpose(0, 1).unsqueeze(2).repeat(1, 1, width)
     pe[d_model + 1::2, :, :] = torch.cos(pos_h * div_term).transpose(0, 1).unsqueeze(2).repeat(1, 1, width)
-
     return pe
-
 
 # models
 def get_gazelle_model(model_name):
