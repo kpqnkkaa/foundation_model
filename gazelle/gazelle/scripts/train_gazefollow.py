@@ -17,11 +17,11 @@ from gazelle.model import get_gazelle_model
 from gazelle.utils import gazefollow_auc, gazefollow_l2
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default="sam_prompt_dinov2_vitb_lora_multi_output_input")
+parser.add_argument('--model', type=str, default="dinov2_vitb_lora_multi_output")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--ckpt_save_dir', type=str, default='./experiments')
-parser.add_argument('--wandb_project', type=str, default='sam_prompt_dinov2_vitb_lora_multi_output_input')
-parser.add_argument('--exp_name', type=str, default='train_ssam_prompt_dinov2_vitb_lora_multi_output_input')
+parser.add_argument('--wandb_project', type=str, default=None)
+parser.add_argument('--exp_name', type=str, default=None)
 parser.add_argument('--log_iter', type=int, default=10, help='how often to log loss during training')
 parser.add_argument('--max_epochs', type=int, default=15)
 parser.add_argument('--batch_size', type=int, default=60)
@@ -129,6 +129,10 @@ def setup_logger(log_file):
     return logger
 
 def main():
+    if args.wandb_project is None:
+        args.wandb_project = args.model
+    if args.exp_name is None:
+        args.exp_name = args.model
     wandb.init(
         project=args.wandb_project,
         name=args.exp_name,

@@ -9,7 +9,7 @@ import gazelle.utils as utils
 import torch.nn.functional as F
 
 class GazeLLE(nn.Module):
-    def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64), is_multi_output=False):
+    def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64), is_multi_output=False, is_sam_prompt=False):
         super().__init__()
         self.backbone = backbone
         self.dim = dim
@@ -23,7 +23,9 @@ class GazeLLE(nn.Module):
         self.featmap_h, self.featmap_w = backbone.get_out_size(in_size)
 
         # 1. 检查能力: 是否支持 Prompt Encoder (即是否为 SAM 系列 Backbone)
-        self.has_prompt_encoder = hasattr(backbone, 'prompt_encoder')
+        if is_sam_prompt:
+          if not hasattr(backbone, 'prompt_encoder'):
+            raise ValueError("SAM Prompt Backbone must have prompt encoder")
 
         # 2. 基础组件 (所有模式共用)
         # 投影层: 适配 Backbone 维度到 Model 维度
@@ -42,7 +44,7 @@ class GazeLLE(nn.Module):
             self.multi_output_tokens = nn.Embedding(3, self.dim)
 
         # Legacy Support: 如果不是 SAM Backbone，还需要旧的 Head Token
-        if not self.has_prompt_encoder:
+        if not is_sam_prompt:
             self.head_token = nn.Embedding(1, self.dim)
 
         # 4. 核心融合层: Standard Transformer (Self-Attention)
@@ -293,10 +295,9 @@ def get_gazelle_model(model_name):
         "gazelle_dinov2_vitb14_inout": gazelle_dinov2_vitb14_inout,
         "gazelle_dinov2_vitl14_inout": gazelle_dinov2_vitl14_inout,
         # 新增sam模型
-        "gazelle_sam_vitb": gazelle_sam_vitb,
-        "gazelle_dinov2_vitb_lora": gazelle_dinov2_vitb_lora,
-        # "sam_prompt_dinov2_vitb": sam_prompt_dinov2_vitb,
-        "sam_prompt_dinov2_vitb_lora_multi_input": sam_prompt_dinov2_vitb_lora_multi_input,
+        "sam_vitb": sam_vitb,
+        "dinov2_vitb_lora": dinov2_vitb_lora,
+        "dinov2_vitb_lora_multi_input": dinov2_vitb_lora_multi_input,
         "dinov2_vitb_lora_multi_output": dinov2_vitb_lora_multi_output
     }
     assert model_name in factory.keys(), "invalid model name"
@@ -326,38 +327,26 @@ def gazelle_dinov2_vitl14_inout():
     model = GazeLLE(backbone, inout=True)
     return model, transform
 
-def gazelle_sam_vitb():
+def sam_vitb():
     backbone = SAMImageEncoder(model_type="vit_b", in_size=(448, 448))
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
     return model, transform
 
-def gazelle_dinov2_vitb_lora():
+def dinov2_vitb_lora():
     backbone = DinoV2Backbone('dinov2_vitb14', is_lora=True)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
     return model, transform
 
-def sam_prompt_dinov2_vitb():
-    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=False, is_multi_input=False)
-    transform = backbone.get_transform((448, 448))
-    model = GazeLLE(backbone, inout=False, is_sam_prompt=True)
-    return model, transform
-
-def sam_prompt_dinov2_vitb_lora():
-    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=False)
-    transform = backbone.get_transform((448, 448))
-    model = GazeLLE(backbone, inout=False, is_sam_prompt=True)
-    return model, transform
-
-def sam_prompt_dinov2_vitb_lora_multi_input():
-    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=True, is_multi_input=True)
+def dinov2_vitb_lora_multi_input():
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=True)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False, is_sam_prompt=True)
     return model, transform
     
-def sam_prompt_dinov2_vitb_lora_multi_output_input():
-    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=True, is_sam_prompt=True)
+def dinov2_vitb_lora_multi_output():
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=False,)
     transform = backbone.get_transform((448, 448))
-    model = GazeLLE(backbone, inout=False, is_multi_output=True)
+    model = GazeLLE(backbone, inout=False, is_multi_output=True, is_sam_prompt=False)
     return model, transform
