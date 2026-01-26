@@ -294,12 +294,11 @@ def get_gazelle_model(model_name):
         "gazelle_dinov2_vitl14_inout": gazelle_dinov2_vitl14_inout,
         # 新增sam模型
         "gazelle_sam_vitb": gazelle_sam_vitb,
-        "sam_sam_vitb": sam_sam_vitb,
-        "sam_dinov2_vitb": sam_dinov2_vitb,
-        "sam_dinov2_vitb_lora": sam_dinov2_vitb_lora,
-        "sam_sam_vitb_lora": sam_sam_vitb_lora,
-        "sam_dinov2_vitb_lora_multi_input": sam_dinov2_vitb_lora_multi_input,
-        "sam_dinov2_vitb_lora_multi_output_input": sam_dinov2_vitb_lora_multi_output_input
+        "gazelle_dinov2_vitb_lora": gazelle_dinov2_vitb_lora,
+        "sam_prompt_dinov2_vitb": sam_prompt_dinov2_vitb,
+        "sam_prompt_dinov2_vitb_lora": sam_prompt_dinov2_vitb_lora,
+        "sam_prompt_dinov2_vitb_lora_multi_input": sam_prompt_dinov2_vitb_lora_multi_input,
+        "sam_prompt_dinov2_vitb_lora_multi_output_input": sam_prompt_dinov2_vitb_lora_multi_output_input
     }
     assert model_name in factory.keys(), "invalid model name"
     return factory[model_name]()
@@ -334,32 +333,26 @@ def gazelle_sam_vitb():
     model = GazeLLE(backbone, inout=False)
     return model, transform
 
-def sam_dinov2_vitb():
+def gazelle_dinov2_vitb_lora():
+    backbone = DinoV2Backbone('dinov2_vitb14', is_lora=True)
+    transform = backbone.get_transform((448, 448))
+    model = GazeLLE(backbone, inout=False)
+    return model, transform
+
+def sam_prompt_dinov2_vitb():
     backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=False, is_multi_input=False)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
     return model, transform
 
-def sam_dinov2_vitb_lora():
+def sam_prompt_dinov2_vitb_lora():
     backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=False)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
     return model, transform
 
-def sam_sam_vitb_lora():
-    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=True, is_multi_input=False)
-    transform = backbone.get_transform((448, 448))
-    model = GazeLLE(backbone, inout=False)
-    return model, transform
-
-def sam_sam_vitb():
-    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=False, is_multi_input=False)
-    transform = backbone.get_transform((448, 448))
-    model = GazeLLE(backbone, inout=False)
-    return model, transform
-
-def sam_dinov2_vitb_lora_multi_input():
-    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=True)
+def sam_prompt_dinov2_vitb_lora_multi_input():
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="sam", is_lora=True, is_multi_input=True)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False)
     return model, transform
