@@ -20,7 +20,7 @@ from gazelle.model import get_gazelle_model
 from gazelle.utils import gazefollow_auc, gazefollow_l2
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default="dinov2_vitb_lora")
+parser.add_argument('--model', type=str, default="dinov2_vitb_multi_output")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--ckpt_save_dir', type=str, default='./experiments')
 parser.add_argument('--wandb_project', type=str, default=None)
@@ -241,22 +241,24 @@ def main():
 
             loss = torch.tensor(0.0, device=heatmap_preds.device)
             heatmap_loss = criterion_bce(heatmap_preds, heatmaps.cuda())
-            if not is_face_crop_mode:
-                loss += heatmap_loss
+            # is_face_crop_mode现在是bool类型的list，所以直接取反会报错先变成tensor
+            is_face_crop_mode = torch.tensor(is_face_crop_mode, device=heatmap_preds.device)
+            valid_mask = 1 - is_face_crop_mode
+            loss += heatmap_loss*valid_mask
 
-            if preds['text_loss'] is not None and not is_face_crop_mode:
+            if preds['text_loss'] is not None:
                 text_loss = preds['text_loss']
-                loss += text_loss*0.01
+                loss += text_loss*valid_mask*0.001
             else:
                 text_loss = None
             
-            if preds['seg'] is not None and not is_face_crop_mode:
+            if preds['seg'] is not None:
                 if isinstance(preds['seg'], list):
                     preds['seg'] = torch.stack(preds['seg']).squeeze(dim=1)
                 else:
                     preds['seg'] = preds['seg'].squeeze(dim=1)
                 seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
-                loss += seg_loss*1.0
+                loss += seg_loss*valid_mask*0.1
             else:
                 seg_loss = None
 
@@ -266,7 +268,7 @@ def main():
                 else:
                     preds['direction'] = preds['direction'].squeeze(dim=1)
                 direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
-                loss += direction_loss*0.2
+                loss += direction_loss*0.02
             else:
                 direction_loss = None
 

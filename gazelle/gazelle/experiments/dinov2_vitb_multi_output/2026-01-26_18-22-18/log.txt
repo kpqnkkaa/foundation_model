@@ -1,0 +1,4 @@
+2026-01-26 18:22:18,698 - Experiment Config: {'model': 'dinov2_vitb_multi_output', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'ckpt_save_dir': './experiments', 'wandb_project': 'dinov2_vitb_multi_output', 'exp_name': 'dinov2_vitb_multi_output', 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
+2026-01-26 18:22:25,523 - Learnable parameters: 7540840
+2026-01-26 18:22:31,194 - 
+[Epoch 0 Training]
