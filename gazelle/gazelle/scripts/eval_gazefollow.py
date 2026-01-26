@@ -41,7 +41,7 @@ class GazeFollow(torch.utils.data.Dataset):
         return len(self.images)
     
 def collate(batch):
-    images, bboxes, gazex, gazey, height, width, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths = zip(*batch)
+    images, bboxes, gazex, gazey, height, width, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask_paths, is_face_crop_mode = zip(*batch)
     return torch.stack(images), list(bboxes), list(gazex), list(gazey), list(height), list(width), list(observer_expressions), list(gaze_directions), list(gaze_point_expressions), list(seg_mask_paths)
 
 @torch.no_grad()

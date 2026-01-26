@@ -227,7 +227,7 @@ def main():
         epoch_losses = []
         
         for cur_iter, batch in pbar:
-            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask = batch
+            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask, is_face_crop_mode = batch
 
             optimizer.zero_grad()
             
@@ -241,15 +241,16 @@ def main():
 
             loss = torch.tensor(0.0, device=heatmap_preds.device)
             heatmap_loss = criterion_bce(heatmap_preds, heatmaps.cuda())
-            loss += heatmap_loss
+            if not is_face_crop_mode:
+                loss += heatmap_loss
 
-            if preds['text_loss'] is not None:
+            if preds['text_loss'] is not None and not is_face_crop_mode:
                 text_loss = preds['text_loss']
                 loss += text_loss*0.01
             else:
                 text_loss = None
             
-            if preds['seg'] is not None:
+            if preds['seg'] is not None and not is_face_crop_mode:
                 if isinstance(preds['seg'], list):
                     preds['seg'] = torch.stack(preds['seg']).squeeze(dim=1)
                 else:
