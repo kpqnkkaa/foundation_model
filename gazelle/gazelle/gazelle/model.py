@@ -18,11 +18,14 @@ class GazeLLE(nn.Module):
         self.inout = inout
         self.in_size = in_size
         self.out_size = out_size
+        self.is_sam_prompt = is_sam_prompt
 
         # 获取 Backbone 输出特征图尺寸
         self.featmap_h, self.featmap_w = backbone.get_out_size(in_size)
 
         # 1. 检查能力: 是否支持 Prompt Encoder (即是否为 SAM 系列 Backbone)
+        # 输出backbone有哪些属性
+        print(backbone.__dict__)
         if is_sam_prompt:
           if not hasattr(backbone, 'prompt_encoder'):
             raise ValueError("SAM Prompt Backbone must have prompt encoder")
@@ -123,7 +126,7 @@ class GazeLLE(nn.Module):
             tokens_to_concat.append(multi_t)
 
         # [B] Prompt Embeddings (SAM 逻辑)
-        if self.has_prompt_encoder:
+        if self.is_sam_prompt:
             # 坐标转换: Normalized -> Absolute
             flat_bboxes = []
             for bbox_list in input["bboxes"]:
@@ -211,7 +214,7 @@ class GazeLLE(nn.Module):
 
         # [Skip] Prompts
         # 如果是 SAM backbone, 跳过 sparse_embeddings 的长度
-        if self.has_prompt_encoder:
+        if self.is_sam_prompt:
             num_prompts = sparse_embeddings.shape[1]
             current_idx += num_prompts
 
