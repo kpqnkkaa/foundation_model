@@ -152,15 +152,14 @@ class GazeLLE(nn.Module):
         # A. Gaze Heatmap Head (Standard Deconv)
         self.heatmap_head = nn.Sequential(
             nn.ConvTranspose2d(dim, dim, kernel_size=2, stride=2),
-            nn.Conv2d(dim, 1, kernel_size=1, bias=False),
-            nn.Sigmoid()
+            nn.Conv2d(dim, 1, kernel_size=1, bias=False)
         )
 
         # B. InOut Head
         if self.inout:
              self.inout_head = nn.Sequential(
                 nn.Linear(self.dim, 128), nn.ReLU(), nn.Dropout(0.1),
-                nn.Linear(128, 1), nn.Sigmoid()
+                nn.Linear(128, 1)
             )
 
         # C. Multi-Output Heads

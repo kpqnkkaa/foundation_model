@@ -1,0 +1,6 @@
+2026-01-27 18:35:05,148 - Experiment Config: {'model': 'dinov2_vitb_multi_output', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'ckpt_save_dir': './experiments', 'wandb_project': 'dinov2_vitb_multi_output', 'exp_name': 'dinov2_vitb_multi_output', 'is_partial_input': False, 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
+2026-01-27 18:35:10,564 - Learnable parameters: 7673064
+2026-01-27 18:35:16,080 - 
+[Epoch 0 Training]
+2026-01-27 18:35:19,002 - Iter 0/1891, heatmap Loss=0.6280, Text Loss=7.2225, Seg Loss=0.4768, Direction Loss=2.1751, Loss=0.7914
+2026-01-27 18:35:26,024 - Iter 10/1891, heatmap Loss=0.0677, Text Loss=3.1967, Seg Loss=1.5861, Direction Loss=1.7966, Loss=0.2942

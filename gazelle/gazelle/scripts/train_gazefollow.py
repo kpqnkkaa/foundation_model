@@ -14,7 +14,7 @@ cv2.setNumThreads(0) # 禁止 OpenCV 多线程，防止死锁
 cv2.ocl.setUseOpenCL(False)
 
 # 1. 强制设置可见显卡为 2, 3
-os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 from gazelle.dataloader import GazeDataset, collate_fn
 from gazelle.model import get_gazelle_model
@@ -262,7 +262,7 @@ def main():
     #     {'params': scratch_params, 'lr': args.lr},
     #     {'params': finetune_params, 'lr': args.lr * 0.1}
     # ]
-    criterion_bce = nn.BCELoss() # 用于Heatmap和Seg
+    criterion_bce = nn.BCEWithLogitsLoss()
     criterion_ce = nn.CrossEntropyLoss(ignore_index=-1) # 用于Direction
     
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -321,8 +321,6 @@ def main():
                 # losses_to_optimize.append((seg_loss*0.1, 1))
             else:
                 seg_loss = None
-            
-            print("winwinwin")
 
             if preds['direction'] is not None:
                 if isinstance(preds['direction'], list):
