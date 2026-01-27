@@ -217,86 +217,86 @@ def main():
     best_epoch = None
 
     for epoch in range(args.max_epochs):
-        # --- TRAIN EPOCH ---
-        model.train()
-        logger.info(f"\n[Epoch {epoch} Training]")
+        # # --- TRAIN EPOCH ---
+        # model.train()
+        # logger.info(f"\n[Epoch {epoch} Training]")
         
-        pbar = tqdm(enumerate(train_dl), total=len(train_dl), 
-                    desc=f"Epoch {epoch} [Train]", unit="batch", dynamic_ncols=True)
+        # pbar = tqdm(enumerate(train_dl), total=len(train_dl), 
+        #             desc=f"Epoch {epoch} [Train]", unit="batch", dynamic_ncols=True)
         
-        epoch_losses = []
+        # epoch_losses = []
         
-        for cur_iter, batch in pbar:
-            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask, is_face_crop_mode = batch
+        # for cur_iter, batch in pbar:
+        #     imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask, is_face_crop_mode = batch
 
-            optimizer.zero_grad()
+        #     optimizer.zero_grad()
             
-            # gaze_point_expression_ids用于计算 Text Generation Loss (仅训练时需要)
-            preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions.cuda(), "gaze_point_expression_ids": gaze_point_expressions.cuda()})
+        #     # gaze_point_expression_ids用于计算 Text Generation Loss (仅训练时需要)
+        #     preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions.cuda(), "gaze_point_expression_ids": gaze_point_expressions.cuda()})
             
-            if isinstance(preds['heatmap'], list):
-                 heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
-            else:
-                 heatmap_preds = preds['heatmap'].squeeze(dim=1)
+        #     if isinstance(preds['heatmap'], list):
+        #          heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
+        #     else:
+        #          heatmap_preds = preds['heatmap'].squeeze(dim=1)
 
-            loss = torch.tensor(0.0, device=heatmap_preds.device)
-            heatmap_loss = criterion_bce(heatmap_preds, heatmaps.cuda())
-            loss += heatmap_loss
+        #     loss = torch.tensor(0.0, device=heatmap_preds.device)
+        #     heatmap_loss = criterion_bce(heatmap_preds, heatmaps.cuda())
+        #     loss += heatmap_loss
 
-            if preds['text_loss'] is not None:
-                text_loss = preds['text_loss']
-                loss += text_loss*0.001
-            else:
-                text_loss = None
+        #     if preds['text_loss'] is not None:
+        #         text_loss = preds['text_loss']
+        #         loss += text_loss*0.001
+        #     else:
+        #         text_loss = None
             
-            if preds['seg'] is not None:
-                if isinstance(preds['seg'], list):
-                    preds['seg'] = torch.stack(preds['seg']).squeeze(dim=1)
-                else:
-                    preds['seg'] = preds['seg'].squeeze(dim=1)
-                seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
-                loss += seg_loss*0.1
-            else:
-                seg_loss = None
+        #     if preds['seg'] is not None:
+        #         if isinstance(preds['seg'], list):
+        #             preds['seg'] = torch.stack(preds['seg']).squeeze(dim=1)
+        #         else:
+        #             preds['seg'] = preds['seg'].squeeze(dim=1)
+        #         seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
+        #         loss += seg_loss*0.1
+        #     else:
+        #         seg_loss = None
 
-            if preds['direction'] is not None:
-                if isinstance(preds['direction'], list):
-                    preds['direction'] = torch.stack(preds['direction']).squeeze(dim=1)
-                else:
-                    preds['direction'] = preds['direction'].squeeze(dim=1)
-                direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
-                loss += direction_loss*0.02
-            else:
-                direction_loss = None
+        #     if preds['direction'] is not None:
+        #         if isinstance(preds['direction'], list):
+        #             preds['direction'] = torch.stack(preds['direction']).squeeze(dim=1)
+        #         else:
+        #             preds['direction'] = preds['direction'].squeeze(dim=1)
+        #         direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
+        #         loss += direction_loss*0.02
+        #     else:
+        #         direction_loss = None
 
-            loss.backward()
-            optimizer.step()
+        #     loss.backward()
+        #     optimizer.step()
             
-            epoch_losses.append(heatmap_loss.item())
+        #     epoch_losses.append(heatmap_loss.item())
 
-            if text_loss is not None:
-                pbar.set_postfix({'heatmap_loss': f"{heatmap_loss.item():.4f}", 'text_loss': f"{text_loss.item():.4f}", 'seg_loss': f"{seg_loss.item():.4f}", 'direction_loss': f"{direction_loss.item():.4f}", 'loss': f"{loss.item():.4f}"})
-            else:
-                pbar.set_postfix({'loss': f"{loss.item():.4f}"})
+        #     if text_loss is not None:
+        #         pbar.set_postfix({'heatmap_loss': f"{heatmap_loss.item():.4f}", 'text_loss': f"{text_loss.item():.4f}", 'seg_loss': f"{seg_loss.item():.4f}", 'direction_loss': f"{direction_loss.item():.4f}", 'loss': f"{loss.item():.4f}"})
+        #     else:
+        #         pbar.set_postfix({'loss': f"{loss.item():.4f}"})
 
-            if cur_iter % args.log_iter == 0:
-                if text_loss is not None:
-                    wandb.log({"train/heatmap_loss": heatmap_loss.item(), "train/text_loss": text_loss.item(), "train/seg_loss": seg_loss.item(), "train/direction_loss": direction_loss.item(), "train/loss": loss.item()})
-                    logger.info(f"Iter {cur_iter}/{len(train_dl)}, heatmap Loss={heatmap_loss.item():.4f}, Text Loss={text_loss.item():.4f}, Seg Loss={seg_loss.item():.4f}, Direction Loss={direction_loss.item():.4f}, Loss={loss.item():.4f}")
-                else:
-                    wandb.log({"train/heatmap_loss": heatmap_loss.item(), "train/loss": loss.item()})
-                    logger.info(f"Iter {cur_iter}/{len(train_dl)}, heatmap Loss={heatmap_loss.item():.4f}, Loss={loss.item():.4f}")
-        scheduler.step()
-        avg_train_loss = np.mean(epoch_losses)
-        logger.info(f"End of Epoch {epoch} Train - Avg Loss: {avg_train_loss:.4f}")
+        #     if cur_iter % args.log_iter == 0:
+        #         if text_loss is not None:
+        #             wandb.log({"train/heatmap_loss": heatmap_loss.item(), "train/text_loss": text_loss.item(), "train/seg_loss": seg_loss.item(), "train/direction_loss": direction_loss.item(), "train/loss": loss.item()})
+        #             logger.info(f"Iter {cur_iter}/{len(train_dl)}, heatmap Loss={heatmap_loss.item():.4f}, Text Loss={text_loss.item():.4f}, Seg Loss={seg_loss.item():.4f}, Direction Loss={direction_loss.item():.4f}, Loss={loss.item():.4f}")
+        #         else:
+        #             wandb.log({"train/heatmap_loss": heatmap_loss.item(), "train/loss": loss.item()})
+        #             logger.info(f"Iter {cur_iter}/{len(train_dl)}, heatmap Loss={heatmap_loss.item():.4f}, Loss={loss.item():.4f}")
+        # scheduler.step()
+        # avg_train_loss = np.mean(epoch_losses)
+        # logger.info(f"End of Epoch {epoch} Train - Avg Loss: {avg_train_loss:.4f}")
 
-        # --- [MODIFIED] 保存 Last 模型 ---
-        # 无论结果如何，每一轮都覆盖保存 'last.pt'
-        ckpt_path_last = os.path.join(exp_dir, 'last.pt')
-        # 兼容 DataParallel 获取原始 module
-        model_to_save = model.module if hasattr(model, 'module') else model
-        torch.save(model_to_save.get_gazelle_state_dict(), ckpt_path_last)
-        logger.info(f"Saved last checkpoint to {ckpt_path_last}")
+        # # --- [MODIFIED] 保存 Last 模型 ---
+        # # 无论结果如何，每一轮都覆盖保存 'last.pt'
+        # ckpt_path_last = os.path.join(exp_dir, 'last.pt')
+        # # 兼容 DataParallel 获取原始 module
+        # model_to_save = model.module if hasattr(model, 'module') else model
+        # torch.save(model_to_save.get_gazelle_state_dict(), ckpt_path_last)
+        # logger.info(f"Saved last checkpoint to {ckpt_path_last}")
 
         # --- EVAL EPOCH ---
         logger.info(f"[Epoch {epoch} Evaluation]")
@@ -310,7 +310,7 @@ def main():
                          desc=f"Epoch {epoch} [Eval]", unit="batch", dynamic_ncols=True)
         
         for cur_iter, batch in eval_pbar:
-            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask = batch
+            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask, is_face_crop_mode = batch
 
             with torch.no_grad():
                 preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions})
