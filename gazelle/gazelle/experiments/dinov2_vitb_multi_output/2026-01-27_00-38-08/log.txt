@@ -1569,3 +1569,51 @@
 2026-01-27 03:52:23,486 - Iter 1860/1891, heatmap Loss=0.0439, Text Loss=1.2284, Seg Loss=0.1711, Direction Loss=1.2929, Loss=0.0992
 2026-01-27 03:52:35,175 - Iter 1870/1891, heatmap Loss=0.0417, Text Loss=1.5351, Seg Loss=0.1321, Direction Loss=0.8200, Loss=0.0867
 2026-01-27 03:52:46,551 - Iter 1880/1891, heatmap Loss=0.0430, Text Loss=1.3447, Seg Loss=0.1352, Direction Loss=0.8082, Loss=0.0862
+2026-01-27 03:52:57,912 - Iter 1890/1891, heatmap Loss=0.0459, Text Loss=1.3345, Seg Loss=0.1225, Direction Loss=1.0893, Loss=0.0932
+2026-01-27 03:52:58,166 - End of Epoch 7 Train - Avg Loss: 0.0436
+2026-01-27 03:52:59,593 - Saved last checkpoint to ./experiments/dinov2_vitb_multi_output/2026-01-27_00-38-08/last.pt
+2026-01-27 03:52:59,594 - [Epoch 7 Evaluation]
+2026-01-27 03:57:26,231 - EVAL EPOCH 7: AUC=0.951, Min L2=0.0546, Avg L2=0.1152
+2026-01-27 03:57:26,234 - 
+[Epoch 8 Training]
+2026-01-27 03:57:28,903 - Iter 0/1891, heatmap Loss=0.0459, Text Loss=1.4168, Seg Loss=0.2042, Direction Loss=0.9452, Loss=0.0994
+2026-01-27 03:57:39,871 - Iter 10/1891, heatmap Loss=0.0436, Text Loss=1.3948, Seg Loss=0.1521, Direction Loss=1.0098, Loss=0.0930
+2026-01-27 03:57:51,144 - Iter 20/1891, heatmap Loss=0.0460, Text Loss=1.3137, Seg Loss=0.1479, Direction Loss=1.1752, Loss=0.0974
+2026-01-27 03:58:02,606 - Iter 30/1891, heatmap Loss=0.0420, Text Loss=1.2140, Seg Loss=0.1375, Direction Loss=0.9518, Loss=0.0869
+2026-01-27 03:58:14,002 - Iter 40/1891, heatmap Loss=0.0482, Text Loss=1.3386, Seg Loss=0.1552, Direction Loss=1.0351, Loss=0.0978
+2026-01-27 03:58:25,828 - Iter 50/1891, heatmap Loss=0.0456, Text Loss=1.4499, Seg Loss=0.1772, Direction Loss=0.9491, Loss=0.0968
+2026-01-27 03:58:37,202 - Iter 60/1891, heatmap Loss=0.0441, Text Loss=1.3915, Seg Loss=0.1470, Direction Loss=0.8880, Loss=0.0905
+2026-01-27 03:58:48,471 - Iter 70/1891, heatmap Loss=0.0403, Text Loss=1.3949, Seg Loss=0.0910, Direction Loss=1.0707, Loss=0.0848
+2026-01-27 03:59:00,144 - Iter 80/1891, heatmap Loss=0.0453, Text Loss=1.3824, Seg Loss=0.1622, Direction Loss=1.0377, Loss=0.0961
+2026-01-27 03:59:11,316 - Iter 90/1891, heatmap Loss=0.0446, Text Loss=1.2922, Seg Loss=0.1639, Direction Loss=1.0864, Loss=0.0957
+2026-01-27 03:59:22,797 - Iter 100/1891, heatmap Loss=0.0426, Text Loss=1.4335, Seg Loss=0.1267, Direction Loss=0.9651, Loss=0.0890
+2026-01-27 03:59:34,056 - Iter 110/1891, heatmap Loss=0.0445, Text Loss=1.3377, Seg Loss=0.1285, Direction Loss=1.2033, Loss=0.0948
+2026-01-27 03:59:45,531 - Iter 120/1891, heatmap Loss=0.0417, Text Loss=1.4057, Seg Loss=0.1424, Direction Loss=1.0534, Loss=0.0911
+2026-01-27 03:59:56,930 - Iter 130/1891, heatmap Loss=0.0438, Text Loss=1.2875, Seg Loss=0.1532, Direction Loss=0.9081, Loss=0.0902
+2026-01-27 04:00:08,422 - Iter 140/1891, heatmap Loss=0.0367, Text Loss=1.4086, Seg Loss=0.1219, Direction Loss=0.9679, Loss=0.0823
+2026-01-27 04:00:19,948 - Iter 150/1891, heatmap Loss=0.0410, Text Loss=1.3819, Seg Loss=0.1223, Direction Loss=0.8420, Loss=0.0839
+2026-01-27 04:00:31,296 - Iter 160/1891, heatmap Loss=0.0420, Text Loss=1.4032, Seg Loss=0.1243, Direction Loss=0.8814, Loss=0.0861
+2026-01-27 04:00:42,847 - Iter 170/1891, heatmap Loss=0.0424, Text Loss=1.4010, Seg Loss=0.0941, Direction Loss=0.8132, Loss=0.0821
+2026-01-27 04:00:54,196 - Iter 180/1891, heatmap Loss=0.0463, Text Loss=1.3170, Seg Loss=0.1444, Direction Loss=1.0557, Loss=0.0950
+2026-01-27 04:01:05,276 - Iter 190/1891, heatmap Loss=0.0427, Text Loss=1.4053, Seg Loss=0.0922, Direction Loss=0.8328, Loss=0.0826
+2026-01-27 04:01:16,986 - Iter 200/1891, heatmap Loss=0.0455, Text Loss=1.3481, Seg Loss=0.1455, Direction Loss=0.9796, Loss=0.0931
+2026-01-27 04:01:28,048 - Iter 210/1891, heatmap Loss=0.0424, Text Loss=1.3604, Seg Loss=0.1518, Direction Loss=0.8285, Loss=0.0878
+2026-01-27 04:01:39,561 - Iter 220/1891, heatmap Loss=0.0397, Text Loss=1.3250, Seg Loss=0.1253, Direction Loss=0.8254, Loss=0.0820
+2026-01-27 04:01:50,994 - Iter 230/1891, heatmap Loss=0.0442, Text Loss=1.3185, Seg Loss=0.1526, Direction Loss=0.7667, Loss=0.0880
+2026-01-27 04:02:02,222 - Iter 240/1891, heatmap Loss=0.0387, Text Loss=1.3584, Seg Loss=0.1479, Direction Loss=0.9641, Loss=0.0864
+2026-01-27 04:02:13,818 - Iter 250/1891, heatmap Loss=0.0445, Text Loss=1.4045, Seg Loss=0.1385, Direction Loss=1.0660, Loss=0.0937
+2026-01-27 04:02:24,560 - Iter 260/1891, heatmap Loss=0.0451, Text Loss=1.3708, Seg Loss=0.1382, Direction Loss=1.0961, Loss=0.0945
+2026-01-27 04:02:35,695 - Iter 270/1891, heatmap Loss=0.0434, Text Loss=1.5198, Seg Loss=0.1506, Direction Loss=1.0623, Loss=0.0949
+2026-01-27 04:02:47,090 - Iter 280/1891, heatmap Loss=0.0409, Text Loss=1.3697, Seg Loss=0.1411, Direction Loss=1.0216, Loss=0.0892
+2026-01-27 04:02:58,629 - Iter 290/1891, heatmap Loss=0.0420, Text Loss=1.3947, Seg Loss=0.1712, Direction Loss=1.2226, Loss=0.0976
+2026-01-27 04:03:09,811 - Iter 300/1891, heatmap Loss=0.0404, Text Loss=1.2810, Seg Loss=0.1329, Direction Loss=0.9183, Loss=0.0849
+2026-01-27 04:03:21,213 - Iter 310/1891, heatmap Loss=0.0436, Text Loss=1.1657, Seg Loss=0.1039, Direction Loss=1.0487, Loss=0.0866
+2026-01-27 04:03:33,054 - Iter 320/1891, heatmap Loss=0.0450, Text Loss=1.3857, Seg Loss=0.1124, Direction Loss=1.0146, Loss=0.0904
+2026-01-27 04:03:44,327 - Iter 330/1891, heatmap Loss=0.0462, Text Loss=1.3115, Seg Loss=0.1470, Direction Loss=1.1022, Loss=0.0960
+2026-01-27 04:03:55,745 - Iter 340/1891, heatmap Loss=0.0444, Text Loss=1.4036, Seg Loss=0.1701, Direction Loss=0.9458, Loss=0.0944
+2026-01-27 04:04:07,044 - Iter 350/1891, heatmap Loss=0.0432, Text Loss=1.3414, Seg Loss=0.1630, Direction Loss=0.8685, Loss=0.0903
+2026-01-27 04:04:18,324 - Iter 360/1891, heatmap Loss=0.0439, Text Loss=1.2928, Seg Loss=0.1797, Direction Loss=1.0068, Loss=0.0949
+2026-01-27 04:04:29,580 - Iter 370/1891, heatmap Loss=0.0423, Text Loss=1.4530, Seg Loss=0.1257, Direction Loss=0.8860, Loss=0.0871
+2026-01-27 04:04:41,206 - Iter 380/1891, heatmap Loss=0.0416, Text Loss=1.2915, Seg Loss=0.1428, Direction Loss=0.9895, Loss=0.0886
+2026-01-27 04:04:52,599 - Iter 390/1891, heatmap Loss=0.0428, Text Loss=1.4314, Seg Loss=0.1781, Direction Loss=0.8226, Loss=0.0913
+2026-01-27 04:05:04,135 - Iter 400/1891, heatmap Loss=0.0445, Text Loss=1.4489, Seg Loss=0.1187, Direction Loss=0.9542, Loss=0.0899
