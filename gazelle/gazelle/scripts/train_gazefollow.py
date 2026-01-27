@@ -74,12 +74,12 @@ class MultiTaskLoss(nn.Module):
         return weighted_losses
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default="dinov2_vitb_multi_input")
+parser.add_argument('--model', type=str, default="dinov2_vitb_multi_output")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--ckpt_save_dir', type=str, default='./experiments')
 parser.add_argument('--wandb_project', type=str, default=None)
-parser.add_argument('--exp_name', type=str, default="dinov2_vitb_multi_input_is_partial_input")
-parser.add_argument('--is_partial_input', default=False, action='store_true')
+parser.add_argument('--exp_name', type=str, default=None)
+parser.add_argument('--is_partial_input', type=bool, default=False, action='store_true')
 parser.add_argument('--log_iter', type=int, default=10, help='how often to log loss during training')
 parser.add_argument('--max_epochs', type=int, default=15)
 parser.add_argument('--batch_size', type=int, default=60)
@@ -216,7 +216,7 @@ def main():
 
     model, transform = get_gazelle_model(args.model)
     model.cuda()
-    mt_loss = MultiTaskLoss(num_tasks=4, anchor_task_idx=0).cuda()
+    # mt_loss = MultiTaskLoss(num_tasks=4, anchor_task_idx=0).cuda()
 
     # for param in model.backbone.parameters(): # freeze backbone
     #     param.requires_grad = False
@@ -266,9 +266,9 @@ def main():
     criterion_ce = nn.CrossEntropyLoss(ignore_index=-1) # 用于Direction
     
     # optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    optimizer = torch.optim.Adam(list(model.parameters()) + list(mt_loss.parameters()), lr=args.lr)
-    pcgrad = PCGrad(optimizer)
-    # optimizer = torch.optim.AdamW(param_dicts, lr=args.lr, weight_decay=1e-4)
+    # optimizer = torch.optim.Adam(list(model.parameters()) + list(mt_loss.parameters()), lr=args.lr)
+    # pcgrad = PCGrad(optimizer)
+    optimizer = torch.optim.AdamW(param_dicts, lr=args.lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs, eta_min=1e-7)
 
     best_min_l2 = 1.0
