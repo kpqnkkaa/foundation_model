@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, default="dinov2_vitb_lora_mix_est")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--is_mix_gaze_estimation', default=False, action='store_true')
-parser.add_argument('--estimation_batch_size', type=int, default=128, help="Total batch size for estimation data")
+parser.add_argument('--estimation_batch_size', type=int, default=64, help="Total batch size for estimation data")
 
 parser.add_argument('--eth_label', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Label/train_temp.label')
 parser.add_argument('--eth_img', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Image')
@@ -241,7 +241,7 @@ def main():
                 
                 if num_est > 0:
                     loss_seg_est = seg_loss_per_sample[is_est].mean()
-                    loss += loss_seg_est * 0.01 # 更小的辅助权重
+                    loss += loss_seg_est * 0.1 * 0.1 # 更小的辅助权重
 
             # --- C. Text Loss ---
             # --- C. Text Loss (Weighted) ---

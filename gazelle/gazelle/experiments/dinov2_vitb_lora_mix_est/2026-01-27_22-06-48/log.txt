@@ -30,3 +30,4 @@
 2026-01-27 22:13:12,712 - Iter 260/1891 heatmap_loss: 0.0463, gaze3d_loss: 0.1686, total_loss: 0.0632
 2026-01-27 22:13:28,975 - Iter 270/1891 heatmap_loss: 0.0505, gaze3d_loss: 0.2143, total_loss: 0.0719
 2026-01-27 22:13:44,948 - Iter 280/1891 heatmap_loss: 0.0447, gaze3d_loss: 0.2017, total_loss: 0.0649
+2026-01-27 22:14:01,382 - Iter 290/1891 heatmap_loss: 0.0435, gaze3d_loss: 0.1811, total_loss: 0.0616
