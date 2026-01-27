@@ -301,6 +301,7 @@ def main():
             loss = torch.tensor(0.0, device=heatmap_preds.device)
             heatmap_loss = criterion_bce(heatmap_preds, heatmaps.cuda())
             loss += heatmap_loss
+            # heatmap_loss = 0
             # losses_to_optimize.append((heatmap_loss, 0))
 
             if preds['text_loss'] is not None:
@@ -326,8 +327,9 @@ def main():
                     preds['direction'] = torch.stack(preds['direction']).squeeze(dim=1)
                 else:
                     preds['direction'] = preds['direction'].squeeze(dim=1)
-                direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
-                loss += direction_loss*0.02
+                # direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
+                # loss += direction_loss*0.02
+                direction_loss = 0
                 # losses_to_optimize.append((direction_loss*0.02, 2))
             else:
                 direction_loss = None
