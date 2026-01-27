@@ -298,10 +298,11 @@ def main():
             else:
                 direction_loss = None
 
-            loss = mt_loss(losses_to_optimize)
-            optimizer.pc_backward(loss)
+            weighted_losses = mt_loss(losses_to_optimize)
+            pcgrad.pc_backward(weighted_losses)
             # loss.backward()
             optimizer.step()
+            loss = sum(weighted_losses)
             
             epoch_losses.append(heatmap_loss.item())
 
