@@ -287,7 +287,7 @@ def main():
                 # 只有 Est 有效
                 if num_est > 0:
                     loss_g3d_est = loss_gaze3d_raw[is_est].mean()
-                    loss += loss_g3d_est * 0.1
+                    loss += loss_g3d_est
                     log_g3d_loss = loss_g3d_est.item()
             
             loss.backward()

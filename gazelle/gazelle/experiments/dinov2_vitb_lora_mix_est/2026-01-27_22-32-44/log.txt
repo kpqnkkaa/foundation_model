@@ -1,0 +1,8 @@
+2026-01-27 22:32:44,721 - Experiment Config: {'model': 'dinov2_vitb_lora_mix_est', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'is_mix_gaze_estimation': True, 'estimation_batch_size': 64, 'eth_label': '/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Label/train_temp.label', 'eth_img': '/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Image', 'gaze360_label': '/mnt/nvme1n1/lululemon/xjj/datasets/Gaze360/Label/train.label', 'gaze360_img': '/mnt/nvme1n1/lululemon/xjj/datasets/Gaze360/Image', 'ckpt_save_dir': './experiments', 'wandb_project': 'dinov2_vitb_lora_mix_est', 'exp_name': 'dinov2_vitb_lora_mix_est', 'is_partial_input': False, 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
+2026-01-27 22:32:44,722 - Initializing Model with Mix Gaze Estimation Mode
+2026-01-27 22:32:54,452 - Loading ETH and Gaze360 Datasets as separate streams...
+2026-01-27 22:33:09,408 - Iter 0/1891 heatmap_loss: 0.6842, gaze3d_loss: 0.4433, total_loss: 1.1927
+2026-01-27 22:33:29,174 - Iter 10/1891 heatmap_loss: 0.0568, gaze3d_loss: 0.4401, total_loss: 0.5005
+2026-01-27 22:33:48,728 - Iter 20/1891 heatmap_loss: 0.0518, gaze3d_loss: 0.3430, total_loss: 0.3948
+2026-01-27 22:34:08,937 - Iter 30/1891 heatmap_loss: 0.0529, gaze3d_loss: 0.3210, total_loss: 0.3739
+2026-01-27 22:34:28,428 - Iter 40/1891 heatmap_loss: 0.0565, gaze3d_loss: 0.3262, total_loss: 0.3827
