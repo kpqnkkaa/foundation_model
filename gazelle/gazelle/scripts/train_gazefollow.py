@@ -142,7 +142,7 @@ def main():
                 "images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, 
                 "observer_expression_ids": observer_expressions.cuda(), "gaze_point_expression_ids": gaze_point_expressions.cuda()
             })
-            loss = torch.tensor(0.0, device=imgs.device)
+            loss = torch.tensor(0.0).cuda()
 
             # 1. Heatmap Loss (不mask，Estimation数据学全0)
             if isinstance(preds['heatmap'], list): heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
