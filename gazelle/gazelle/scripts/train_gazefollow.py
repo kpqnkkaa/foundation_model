@@ -305,7 +305,7 @@ def main():
             if preds['text_loss'] is not None:
                 text_loss = preds['text_loss']
                 # loss += text_loss*0.01
-                losses_to_optimize.append((text_loss, 3))
+                losses_to_optimize.append((text_loss*0.01, 3))
             else:
                 text_loss = None
             
@@ -316,7 +316,7 @@ def main():
                     preds['seg'] = preds['seg'].squeeze(dim=1)
                 seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
                 # loss += seg_loss*0.1
-                losses_to_optimize.append((seg_loss, 1))
+                losses_to_optimize.append((seg_loss*0.1, 1))
             else:
                 seg_loss = None
 
@@ -327,11 +327,12 @@ def main():
                     preds['direction'] = preds['direction'].squeeze(dim=1)
                 direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
                 # loss += direction_loss*0.02
-                losses_to_optimize.append((direction_loss, 2))
+                losses_to_optimize.append((direction_loss*0.02, 2))
             else:
                 direction_loss = None
 
-            weighted_losses = mt_loss(losses_to_optimize)
+            # weighted_losses = mt_loss(losses_to_optimize)
+            weighted_losses = [loss for loss, _ in losses_to_optimize]
             pcgrad.pc_backward(weighted_losses)
             loss = sum(weighted_losses)
             # loss.backward()
