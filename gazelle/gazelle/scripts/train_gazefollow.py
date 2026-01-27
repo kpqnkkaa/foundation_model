@@ -14,6 +14,7 @@ from torch.utils.data import ConcatDataset
 from gazelle.backbone import SAMBackboneWrapper 
 from gazelle.model import GazeLLE 
 import torchvision.transforms.functional as F_vis
+import torch.nn.functional as F
 
 cv2.setNumThreads(0)
 cv2.ocl.setUseOpenCL(False)
@@ -160,7 +161,7 @@ def main():
                 else: gaze3d_preds = preds['gaze3d'].squeeze(dim=1)
                 
                 has_3d_mask = has_3d.cuda().float()
-                loss_gaze3d_raw = F_vis.l1_loss(gaze3d_preds, gaze3d.cuda(), reduction='none').mean(dim=1)
+                loss_gaze3d_raw = F.l1_loss(gaze3d_preds, gaze3d.cuda(), reduction='none').mean(dim=1)
                 
                 num_valid_3d = has_3d_mask.sum()
                 if num_valid_3d > 0:
