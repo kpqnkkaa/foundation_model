@@ -218,7 +218,7 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
                 use_text = False; use_eye = False; use_bbox = True
 
             if not use_bbox: bbox_norm = [0.0, 0.0, 0.0, 0.0] 
-            if not use_eye: eye_norm = [0.0, 0.0]  
+            if not use_eye: eye_norm = [-1.0, -1.0] 
             if not use_text: observer_expression = ""
 
         # Tokenization
