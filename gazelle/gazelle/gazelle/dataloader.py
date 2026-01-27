@@ -88,7 +88,7 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
         if gaze_dir_str in direction_map:
             gaze_direction = direction_map[gaze_dir_str]
         else:
-            gaze_direction = -1
+            gaze_direction = -100
         
         # 4. Prepare Seg Mask
         seg_mask_path = head_data.get('seg_mask_path')

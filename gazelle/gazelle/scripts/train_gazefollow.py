@@ -79,7 +79,7 @@ parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj
 parser.add_argument('--ckpt_save_dir', type=str, default='./experiments')
 parser.add_argument('--wandb_project', type=str, default=None)
 parser.add_argument('--exp_name', type=str, default=None)
-parser.add_argument('--is_partial_input', type=bool, default=False, action='store_true')
+parser.add_argument('--is_partial_input', default=False, action='store_true')
 parser.add_argument('--log_iter', type=int, default=10, help='how often to log loss during training')
 parser.add_argument('--max_epochs', type=int, default=15)
 parser.add_argument('--batch_size', type=int, default=60)
