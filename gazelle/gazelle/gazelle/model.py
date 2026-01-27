@@ -77,7 +77,8 @@ class GazeGuideModule(nn.Module):
 
 
 class GazeLLE(nn.Module):
-    def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64), is_multi_output=False, is_sam_prompt=False, is_mix_gaze_estimation=False):
+    # [Modified] Added use_gaze_guide parameter, default False
+    def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64), is_multi_output=False, is_sam_prompt=False, is_mix_gaze_estimation=False, use_gaze_guide=False):
         super().__init__()
         self.backbone = backbone
         self.dim = dim
@@ -88,6 +89,7 @@ class GazeLLE(nn.Module):
         self.out_size = out_size
         self.is_sam_prompt = is_sam_prompt
         self.is_mix_gaze_estimation = is_mix_gaze_estimation
+        self.use_gaze_guide = use_gaze_guide # [New] Store flag
 
         # 获取 Backbone 输出特征图尺寸
         self.featmap_h, self.featmap_w = backbone.get_out_size(in_size)
@@ -131,9 +133,9 @@ class GazeLLE(nn.Module):
                 nn.Linear(128, 2) # 输出 [Yaw, Pitch]
             )
 
-        # [新增] Gaze Guide Module 
-        # 只要有方向信息（无论是 3D Gaze 还是 2D Direction），就启用引导
-        if self.is_mix_gaze_estimation or self.is_multi_output:
+        # [Modified] Gaze Guide Module Initialization
+        # 只有当开启开关 且 有方向信息来源时才初始化
+        if self.use_gaze_guide and (self.is_mix_gaze_estimation or self.is_multi_output):
             self.gaze_guide = GazeGuideModule(self.dim)
 
         # 4. 核心融合层: Standard Transformer (Self-Attention)
@@ -153,6 +155,7 @@ class GazeLLE(nn.Module):
         self.heatmap_head = nn.Sequential(
             nn.ConvTranspose2d(dim, dim, kernel_size=2, stride=2),
             nn.Conv2d(dim, 1, kernel_size=1, bias=False)
+            # No Sigmoid
         )
 
         # B. InOut Head
@@ -160,6 +163,7 @@ class GazeLLE(nn.Module):
              self.inout_head = nn.Sequential(
                 nn.Linear(self.dim, 128), nn.ReLU(), nn.Dropout(0.1),
                 nn.Linear(128, 1)
+                # No Sigmoid
             )
 
         # C. Multi-Output Heads
@@ -328,10 +332,10 @@ class GazeLLE(nn.Module):
         x_img = x_img_tokens.permute(0, 2, 1).reshape(x.shape[0], self.dim, self.featmap_h, self.featmap_w)
         
         # ============================================================
-        # [Step 2] Apply Gaze Guide
-        # 如果有 Gaze 信息 (无论是 3D 还是 2D)，用它来增强图像特征
+        # [Step 2] Apply Gaze Guide (Optional)
+        # 只有在 use_gaze_guide=True 且 module 存在时才应用
         # ============================================================
-        if hasattr(self, 'gaze_guide') and gaze_guide_embedding is not None:
+        if self.use_gaze_guide and hasattr(self, 'gaze_guide') and gaze_guide_embedding is not None:
             # x_img_guided 蕴含了 "沿着这个方向看" 的语义
             x_img_guided = self.gaze_guide(x_img, gaze_guide_embedding)
             x_img_final = x_img + x_img_guided # Residual connection
@@ -366,9 +370,8 @@ class GazeLLE(nn.Module):
             output_dict["seg"] = utils.split_tensors(seg_map, num_ppl_per_img)
 
             # 2. Text Output
-            # 将 Gaze Embedding 融合进 Text Token，作为 Condition
-            # 语义: "在 [gaze_direction] 方向上的 [text_semantic]"
-            if gaze_guide_embedding is not None:
+            # 将 Gaze Embedding 融合进 Text Token，作为 Condition (如果启用了引导)
+            if self.use_gaze_guide and gaze_guide_embedding is not None:
                 text_input_feat = text_token_vec + gaze_guide_embedding
             else:
                 text_input_feat = text_token_vec
@@ -439,7 +442,8 @@ def get_gazelle_model(model_name):
         "dinov2_vitb_lora": dinov2_vitb_lora,
         "dinov2_vitb_multi_input": dinov2_vitb_multi_input,
         "dinov2_vitb_multi_output": dinov2_vitb_multi_output,
-        "dinov2_vitb_lora_multi_output": dinov2_vitb_lora_multi_output
+        "dinov2_vitb_lora_multi_output": dinov2_vitb_lora_multi_output,
+        "dinov2_vitb_lora_mix_est": dinov2_vitb_lora_mix_est
     }
     assert model_name in factory.keys(), "invalid model name"
     return factory[model_name]()
@@ -496,4 +500,10 @@ def dinov2_vitb_lora_multi_output():
     backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=False,)
     transform = backbone.get_transform((448, 448))
     model = GazeLLE(backbone, inout=False, is_multi_output=True, is_sam_prompt=False)
+    return model, transform
+
+def dinov2_vitb_lora_mix_est():
+    backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=True, is_multi_input=False,)
+    transform = backbone.get_transform((448, 448))
+    model = GazeLLE(backbone, inout=False, is_multi_output=False, is_sam_prompt=False, is_mix_gaze_estimation=True, use_gaze_guide=True)
     return model, transform
