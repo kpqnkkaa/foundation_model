@@ -10,7 +10,6 @@ import logging
 from tqdm import tqdm
 import cv2
 import math
-from torch.utils.data import ConcatDataset
 from gazelle.backbone import SAMBackboneWrapper 
 from gazelle.model import GazeLLE 
 import torchvision.transforms.functional as F_vis
@@ -29,6 +28,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, default="dinov2_vitb_lora_mix_est")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--is_mix_gaze_estimation', default=False, action='store_true')
+parser.add_argument('--estimation_batch_size', type=int, default=32, help="Total batch size for estimation data")
+
 parser.add_argument('--eth_label', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Label/train_temp.label')
 parser.add_argument('--eth_img', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Image')
 parser.add_argument('--gaze360_label', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/Gaze360/Label/train.label')
@@ -39,10 +40,43 @@ parser.add_argument('--exp_name', type=str, default=None)
 parser.add_argument('--is_partial_input', default=False, action='store_true')
 parser.add_argument('--log_iter', type=int, default=10)
 parser.add_argument('--max_epochs', type=int, default=15)
-parser.add_argument('--batch_size', type=int, default=60)
+parser.add_argument('--batch_size', type=int, default=60) # GazeFollow Batch Size
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--n_workers', type=int, default=8)
 args = parser.parse_args()
+
+# --- 辅助函数 ---
+def merge_batches(batches):
+    batches = [b for b in batches if b is not None]
+    if len(batches) == 0: return None
+    if len(batches) == 1: return batches[0]
+    
+    merged = []
+    num_items = len(batches[0]) 
+    for i in range(num_items):
+        item_example = batches[0][i]
+        if isinstance(item_example, torch.Tensor):
+            merged.append(torch.cat([b[i] for b in batches], dim=0))
+        elif isinstance(item_example, list):
+            new_list = []
+            for b in batches: new_list.extend(b[i])
+            merged.append(new_list)
+        elif isinstance(item_example, tuple):
+            new_list = []
+            for b in batches: new_list.extend(list(b[i]))
+            merged.append(new_list)
+        else:
+            raise TypeError(f"Unsupported type: {type(item_example)}")
+    return tuple(merged)
+
+def get_infinite_iter(loader):
+    iterator = iter(loader)
+    while True:
+        try:
+            yield next(iterator)
+        except StopIteration:
+            iterator = iter(loader)
+            yield next(iterator)
 
 class DataParallelWrapper(nn.DataParallel):
     def forward(self, input_dict):
@@ -110,15 +144,21 @@ def main():
     if torch.cuda.device_count() > 1: model = DataParallelWrapper(model)
 
     gazefollow_train = GazeDataset('gazefollow', args.data_path, 'train', transform, is_partial_input=args.is_partial_input, is_mix_gaze_estimation=args.is_mix_gaze_estimation)
+    train_dl_gf = torch.utils.data.DataLoader(gazefollow_train, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, num_workers=args.n_workers)
+    
+    iter_eth = None
+    iter_g360 = None
     if args.is_mix_gaze_estimation:
-        logger.info("Loading ETH and Gaze360 Datasets for mixed training...")
-        eth_train = GazeEstimationDataset(args.eth_label, args.eth_img, transform, is_train=True)
-        gaze360_train = GazeEstimationDataset(args.gaze360_label, args.gaze360_img, transform, is_train=True)
-        train_dataset = ConcatDataset([gazefollow_train, eth_train, gaze360_train])
-    else:
-        train_dataset = gazefollow_train
+        logger.info("Loading ETH and Gaze360 Datasets as separate streams...")
+        est_bs_per_set = args.estimation_batch_size // 2
+        if est_bs_per_set > 0:
+            eth_train = GazeEstimationDataset(args.eth_label, args.eth_img, transform, is_train=True)
+            gaze360_train = GazeEstimationDataset(args.gaze360_label, args.gaze360_img, transform, is_train=True)
+            eth_dl = torch.utils.data.DataLoader(eth_train, batch_size=est_bs_per_set, shuffle=True, collate_fn=collate_fn, num_workers=args.n_workers//2)
+            gaze360_dl = torch.utils.data.DataLoader(gaze360_train, batch_size=est_bs_per_set, shuffle=True, collate_fn=collate_fn, num_workers=args.n_workers//2)
+            iter_eth = get_infinite_iter(eth_dl)
+            iter_g360 = get_infinite_iter(gaze360_dl)
 
-    train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, num_workers=args.n_workers)
     eval_dataset = GazeDataset('gazefollow', args.data_path, 'test', transform, is_partial_input=args.is_partial_input)
     eval_dl = torch.utils.data.DataLoader(eval_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, num_workers=args.n_workers)
 
@@ -132,75 +172,103 @@ def main():
 
     for epoch in range(args.max_epochs):
         model.train()
-        pbar = tqdm(enumerate(train_dl), total=len(train_dl), desc=f"Epoch {epoch}", unit="batch", dynamic_ncols=True)
+        pbar = tqdm(enumerate(train_dl_gf), total=len(train_dl_gf), desc=f"Epoch {epoch}", unit="batch", dynamic_ncols=True)
         
-        for cur_iter, batch in pbar:
-            # [Modified] Unpack 16 items
-            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask, is_face_crop_mode, gaze3d, has_3d = batch
+        for cur_iter, batch_gf in pbar:
+            # 1. Merge Batches
+            batches_to_merge = [batch_gf]
+            if args.is_mix_gaze_estimation:
+                if iter_eth is not None: batches_to_merge.append(next(iter_eth))
+                if iter_g360 is not None: batches_to_merge.append(next(iter_g360))
+            
+            final_batch = merge_batches(batches_to_merge)
+            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask, is_face_crop_mode, gaze3d, has_3d = final_batch
+
+            # 2. Construct Weight Map
+            # has_3d: 0 for GazeFollow, 1 for Estimation
+            is_est = has_3d.bool().cuda()
+            is_gf = ~is_est 
+            
+            # [Core Logic] Define per-sample weights for aux tasks
+            # GF samples = 1.0, Estimation samples = 0.1
+            aux_weights = torch.ones(imgs.shape[0], device=imgs.device)
+            aux_weights[is_est] = 0.1 
 
             optimizer.zero_grad()
             preds = model({
                 "images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, 
                 "observer_expression_ids": observer_expressions.cuda(), "gaze_point_expression_ids": gaze_point_expressions.cuda()
             })
-            loss = torch.tensor(0.0).cuda()
+            loss = 0.0
 
-            # 1. Heatmap Loss (不mask，Estimation数据学全0)
+            # --- A. Heatmap Loss ---
+            # GF: Learn valid heatmap (Weight 1.0)
+            # Est: Learn zero heatmap (Weight 0.1)
             if isinstance(preds['heatmap'], list): heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
             else: heatmap_preds = preds['heatmap'].squeeze(dim=1)
             
-            # 使用 valid_mask (根据图像范围等, 此处假设所有数据都算Loss)
-            # 即使是 Estimation 数据，heatmaps 是全 0，模型应该学全 0
             pixel_loss = criterion_logits(heatmap_preds, heatmaps.cuda())
-            heatmap_loss = pixel_loss.mean() # 简单起见对Batch取平均
+            # Reduction: Mean over H,W -> [B]
+            loss_per_sample = pixel_loss.mean(dim=(1, 2))
+            # Weighted Mean over Batch
+            heatmap_loss = (loss_per_sample * aux_weights).mean()
             loss += heatmap_loss
 
-            # 2. Gaze 3D Loss (只反传有标签的数据)
+            # --- B. Gaze 3D Loss (Strictly Masked) ---
+            # Only for Est samples. GF has no label.
             if preds['gaze3d'] is not None and args.is_mix_gaze_estimation:
                 if isinstance(preds['gaze3d'], list): gaze3d_preds = torch.stack(preds['gaze3d']).squeeze(dim=1)
                 else: gaze3d_preds = preds['gaze3d'].squeeze(dim=1)
                 
-                has_3d_mask = has_3d.cuda().float()
                 loss_gaze3d_raw = F.l1_loss(gaze3d_preds, gaze3d.cuda(), reduction='none').mean(dim=1)
                 
-                num_valid_3d = has_3d_mask.sum()
+                # Apply Mask (not weight) because GF labels are invalid
+                num_valid_3d = is_est.float().sum()
                 if num_valid_3d > 0:
-                    gaze3d_loss = (loss_gaze3d_raw * has_3d_mask).sum() / num_valid_3d
-                    loss += gaze3d_loss * 0.1 
+                    gaze3d_loss = (loss_gaze3d_raw * is_est.float()).sum() / num_valid_3d
+                    loss += gaze3d_loss * 0.1 # Global task weight
                 else:
                     gaze3d_loss = torch.tensor(0.0)
             else:
                 gaze3d_loss = torch.tensor(0.0)
 
-            # 3. Text & Direction
-            if preds['text_loss'] is not None: loss += preds['text_loss'] * 0.01
-            
+            # --- C. Text Loss ---
+            # GF: Valid text. Est: "outside of image". Both learnable.
+            # Implicitly, Est contributes to the batch mean. 
+            # We add it with a global small weight.
+            if preds['text_loss'] is not None: 
+                loss += preds['text_loss'] * 0.01
+
+            # --- D. Direction Loss ---
+            # GF: Valid label. Est: -100 (Ignored by CE).
+            # So Est samples contribute 0 loss automatically.
             if preds['direction'] is not None:
                 if isinstance(preds['direction'], list): dir_preds = torch.stack(preds['direction']).squeeze(dim=1)
                 else: dir_preds = preds['direction'].squeeze(dim=1)
+                
                 clean_target = gaze_directions.clone()
                 clean_target[(clean_target < 0) | (clean_target >= 8)] = -100
+                
                 direction_loss = criterion_ce(dir_preds, clean_target.cuda())
                 loss += direction_loss * 0.02
-            else: direction_loss = torch.tensor(0.0)
+            else:
+                direction_loss = torch.tensor(0.0)
             
             loss.backward()
             optimizer.step()
+            
             print_dict = {}
             print_dict['heatmap_loss'] = heatmap_loss.item()
-            if preds['text_loss'] is not None:
-                print_dict['text_loss'] = preds['text_loss'].item()
-            if preds['direction'] is not None:
-                print_dict['direction_loss'] = direction_loss.item()
-            if preds['gaze3d'] is not None:
-                print_dict['gaze3d_loss'] = gaze3d_loss.item()
+            if preds['text_loss'] is not None: print_dict['text_loss'] = preds['text_loss'].item()
+            if preds['direction'] is not None: print_dict['direction_loss'] = direction_loss.item()
+            if preds['gaze3d'] is not None: print_dict['gaze3d_loss'] = gaze3d_loss.item()
             print_dict['total_loss'] = loss.item()
             
             pbar.set_postfix(print_dict)
 
             if cur_iter % args.log_iter == 0: 
                 wandb.log(print_dict)
-                logger.info(f"Iter {cur_iter}/{len(train_dl)}"+", ".join([f"{k}: {v:.4f}" for k, v in print_dict.items()]))
+                logger.info(f"Iter {cur_iter}/{len(train_dl_gf)}"+", ".join([f"{k}: {v:.4f}" for k, v in print_dict.items()]))
 
         scheduler.step()
         ckpt_path_last = os.path.join(exp_dir, 'last.pt')
