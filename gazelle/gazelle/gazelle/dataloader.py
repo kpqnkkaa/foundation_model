@@ -151,7 +151,7 @@ class GazeDataset(torch.utils.data.dataset.Dataset):
         is_face_crop_mode = False
 
         if self.aug:
-            if self.is_mix_gaze_estimation and np.random.sample() <= 0.2:
+            if self.is_mix_gaze_estimation and np.random.sample() <= 0.1:
                 is_face_crop_mode = True
                 
                 raw_bbox = head_data['bbox']
