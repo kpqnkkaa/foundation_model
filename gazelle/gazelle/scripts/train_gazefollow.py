@@ -321,15 +321,16 @@ def main():
                 # losses_to_optimize.append((seg_loss*0.1, 1))
             else:
                 seg_loss = None
+            
+            print("winwinwin")
 
             if preds['direction'] is not None:
                 if isinstance(preds['direction'], list):
                     preds['direction'] = torch.stack(preds['direction']).squeeze(dim=1)
                 else:
                     preds['direction'] = preds['direction'].squeeze(dim=1)
-                # direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
-                # loss += direction_loss*0.02
-                direction_loss = 0
+                direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
+                loss += direction_loss*0.02
                 # losses_to_optimize.append((direction_loss*0.02, 2))
             else:
                 direction_loss = None
