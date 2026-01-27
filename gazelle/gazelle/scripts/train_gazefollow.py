@@ -185,17 +185,21 @@ def main():
             
             loss.backward()
             optimizer.step()
-            print_str = f"heatmap_loss: {heatmap_loss.item():.4f}"
+            print_dict = {}
+            print_dict['heatmap_loss'] = heatmap_loss.item()
             if preds['text_loss'] is not None:
-                print_str += f", text_loss: {preds['text_loss'].item():.4f}"
+                print_dict['text_loss'] = preds['text_loss'].item()
             if preds['direction'] is not None:
-                print_str += f", direction_loss: {direction_loss.item():.4f}"
+                print_dict['direction_loss'] = direction_loss.item()
             if preds['gaze3d'] is not None:
-                print_str += f", gaze3d_loss: {gaze3d_loss.item():.4f}"
-            print_str += f", total_loss: {loss.item():.4f}"
-            logger.info(print_str)
-            pbar.set_description(print_str)
-            if cur_iter % args.log_iter == 0: wandb.log({"train/loss": loss.item(), "train/heatmap_loss": heatmap_loss.item(), "train/gaze3d_loss": gaze3d_loss.item()})
+                print_dict['gaze3d_loss'] = gaze3d_loss.item()
+            print_dict['total_loss'] = loss.item()
+            
+            pbar.set_postfix(print_dict)
+
+            if cur_iter % args.log_iter == 0: 
+                wandb.log(print_dict)
+                logger.info(f"Iter {cur_iter}/{len(train_dl)}"+", ".join([f"{k}: {v:.4f}" for k, v in print_dict.items()]))
 
         scheduler.step()
         ckpt_path_last = os.path.join(exp_dir, 'last.pt')
