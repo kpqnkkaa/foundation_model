@@ -19,6 +19,28 @@ from gazelle.dataloader import GazeDataset, collate_fn
 from gazelle.model import get_gazelle_model
 from gazelle.utils import gazefollow_auc, gazefollow_l2
 
+from pcgrad import PCGrad  # 确保安装: pip install pcgrad
+
+class MultiTaskLoss(nn.Module):
+    def __init__(self, num_tasks=4):
+        super().__init__()
+        # 初始化 4 个可学习参数 (对应 Heatmap, Seg, Direction, Text)
+        # log_vars = log(sigma^2)
+        self.log_vars = nn.Parameter(torch.zeros(num_tasks))
+
+    def forward(self, input_losses):
+        """
+        input_losses: list of tuples (loss_value, task_index)
+        task_index mapping: 0:Heatmap, 1:Seg, 2:Direction, 3:Text
+        """
+        weighted_losses = []
+        for loss, idx in input_losses:
+            # 核心公式: Loss / (2*sigma^2) + log(sigma)
+            precision = torch.exp(-self.log_vars[idx])
+            weighted_loss = precision * loss + 0.5 * self.log_vars[idx]
+            weighted_losses.append(weighted_loss)
+        return weighted_losses
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, default="dinov2_vitb_multi_output")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
@@ -161,6 +183,7 @@ def main():
 
     model, transform = get_gazelle_model(args.model)
     model.cuda()
+    mt_loss = MultiTaskLoss(num_tasks=4).cuda()
 
     # for param in model.backbone.parameters(): # freeze backbone
     #     param.requires_grad = False
@@ -209,7 +232,8 @@ def main():
     criterion_bce = nn.BCELoss() # 用于Heatmap和Seg
     criterion_ce = nn.CrossEntropyLoss(ignore_index=-1) # 用于Direction
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(list(model.parameters()) + list(mt_loss.parameters()), lr=args.lr)
+    pcgrad = PCGrad(optimizer)
     # optimizer = torch.optim.AdamW(param_dicts, lr=args.lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs, eta_min=1e-7)
 
