@@ -13,6 +13,73 @@ import math
 cv2.setNumThreads(0) # 禁止 OpenCV 多线程，防止死锁
 cv2.ocl.setUseOpenCL(False)
 
+# ============================================================
+# Debug / Safety Guards
+# ============================================================
+# 用于分类任务的 ignore_index（与 dataloader.py 保持一致）
+IGNORE_INDEX = -100
+
+def _print_tensor_stats(name: str, t: torch.Tensor, cur_iter: int, every: int = 100):
+    """轻量 debug：每隔 every 次打印一次，避免刷屏。"""
+    if t is None or not isinstance(t, torch.Tensor):
+        return
+    if every <= 0 or (cur_iter % every) != 0:
+        return
+    with torch.no_grad():
+        tt = t.detach()
+        # 先搬到 CPU 统计（避免触发更多 CUDA 异常）
+        if tt.is_cuda:
+            tt = tt.cpu()
+        finite = torch.isfinite(tt)
+        n = tt.numel()
+        n_finite = int(finite.sum().item()) if n > 0 else 0
+        msg = (
+            f"[debug] {name}: shape={tuple(t.shape)} dtype={t.dtype} device={t.device} "
+            f"finite={n_finite}/{n}"
+        )
+        if n > 0 and n_finite > 0:
+            msg += f" min={tt[finite].min().item():.4g} max={tt[finite].max().item():.4g}"
+        print(msg)
+
+def _sanitize_class_targets(
+    targets: torch.Tensor,
+    num_classes: int,
+    cur_iter: int,
+    name: str = "targets",
+    every: int = 100,
+    ignore_index: int = IGNORE_INDEX,
+):
+    """
+    CrossEntropy 的 target 必须满足:
+      - target in [0, num_classes-1] 或者 target == ignore_index
+    若发现越界值，会打印并把它们置为 ignore_index，防止 CUDA device-side assert。
+    """
+    if targets is None:
+        return None
+    if not isinstance(targets, torch.Tensor):
+        raise TypeError(f"{name} must be a torch.Tensor, got {type(targets)}")
+
+    # CE 需要 Long
+    if targets.dtype != torch.long:
+        targets = targets.long()
+
+    clean = targets.clone()
+    invalid_mask = (clean != ignore_index) & ((clean < 0) | (clean >= num_classes))
+    if invalid_mask.any():
+        # 只在间隔点打印，避免刷屏
+        if every > 0 and (cur_iter % every) == 0:
+            bad_vals = clean[invalid_mask].detach()
+            if bad_vals.is_cuda:
+                bad_vals = bad_vals.cpu()
+            print(
+                f"⚠️ Warning: Found {int(invalid_mask.sum().item())} invalid {name} "
+                f"(set to {ignore_index}). num_classes={num_classes}. "
+                f"examples={bad_vals[:10].tolist()}"
+            )
+        clean[invalid_mask] = ignore_index
+
+    return clean
+
 # 1. 强制设置可见显卡为 2, 3
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
@@ -81,6 +148,7 @@ parser.add_argument('--wandb_project', type=str, default=None)
 parser.add_argument('--exp_name', type=str, default=None)
 parser.add_argument('--is_partial_input', default=False, action='store_true')
 parser.add_argument('--log_iter', type=int, default=10, help='how often to log loss during training')
+parser.add_argument('--debug_steps', type=int, default=-1, help='if > 0, run only this many train iterations then exit (for debugging)')
 parser.add_argument('--max_epochs', type=int, default=15)
 parser.add_argument('--batch_size', type=int, default=60)
 parser.add_argument('--lr', type=float, default=1e-3)
@@ -263,7 +331,8 @@ def main():
     #     {'params': finetune_params, 'lr': args.lr * 0.1}
     # ]
     criterion_bce = nn.BCEWithLogitsLoss()
-    criterion_ce = nn.CrossEntropyLoss(ignore_index=-1) # 用于Direction
+    # dataloader.py 中无效方向 label 用的是 -100，这里必须对齐，否则 target=-100 会越界触发 CUDA assert
+    criterion_ce = nn.CrossEntropyLoss(ignore_index=IGNORE_INDEX) # 用于Direction
     
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     # optimizer = torch.optim.Adam(list(model.parameters()) + list(mt_loss.parameters()), lr=args.lr)
@@ -299,6 +368,9 @@ def main():
                  heatmap_preds = preds['heatmap'].squeeze(dim=1)
 
             loss = torch.tensor(0.0, device=heatmap_preds.device)
+            # --- Heatmap Loss Guard ---
+            _print_tensor_stats("heatmap_preds", heatmap_preds, cur_iter, every=100)
+            _print_tensor_stats("heatmaps_gt", heatmaps, cur_iter, every=100)
             heatmap_loss = criterion_bce(heatmap_preds, heatmaps.cuda())
             loss += heatmap_loss
             # heatmap_loss = 0
@@ -306,6 +378,9 @@ def main():
 
             if preds['text_loss'] is not None:
                 text_loss = preds['text_loss']
+                # --- Text Loss Guard ---
+                if cur_iter % 100 == 0 and not torch.isfinite(text_loss.detach()).all():
+                    print(f"⚠️ Warning: text_loss is not finite at iter={cur_iter}: {text_loss.detach().item()}")
                 loss += text_loss*0.01
                 # losses_to_optimize.append((text_loss*0.01, 3))
             else:
@@ -316,6 +391,9 @@ def main():
                     preds['seg'] = torch.stack(preds['seg']).squeeze(dim=1)
                 else:
                     preds['seg'] = preds['seg'].squeeze(dim=1)
+                # --- Seg Loss Guard ---
+                _print_tensor_stats("seg_preds", preds['seg'], cur_iter, every=100)
+                _print_tensor_stats("seg_mask_gt", seg_mask, cur_iter, every=100)
                 seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
                 loss += seg_loss*0.1
                 # losses_to_optimize.append((seg_loss*0.1, 1))
@@ -327,7 +405,19 @@ def main():
                     preds['direction'] = torch.stack(preds['direction']).squeeze(dim=1)
                 else:
                     preds['direction'] = preds['direction'].squeeze(dim=1)
-                direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
+                # --- Direction Loss Guard ---
+                _print_tensor_stats("direction_logits", preds['direction'], cur_iter, every=100)
+                _print_tensor_stats("gaze_directions_raw", gaze_directions, cur_iter, every=100)
+                num_classes = int(preds['direction'].shape[-1])
+                clean_directions = _sanitize_class_targets(
+                    gaze_directions.cuda(),
+                    num_classes=num_classes,
+                    cur_iter=cur_iter,
+                    name="gaze_directions",
+                    every=100,
+                    ignore_index=IGNORE_INDEX,
+                )
+                direction_loss = criterion_ce(preds['direction'], clean_directions)
                 loss += direction_loss*0.02
                 # losses_to_optimize.append((direction_loss*0.02, 2))
             else:
@@ -354,6 +444,11 @@ def main():
                 else:
                     wandb.log({"train/heatmap_loss": heatmap_loss.item(), "train/loss": loss.item()})
                     logger.info(f"Iter {cur_iter}/{len(train_dl)}, heatmap Loss={heatmap_loss.item():.4f}, Loss={loss.item():.4f}")
+
+            # Debug early-exit
+            if args.debug_steps > 0 and (cur_iter + 1) >= args.debug_steps:
+                logger.info(f"[debug] Reached debug_steps={args.debug_steps}. Exiting after this iteration.")
+                break
         scheduler.step()
         avg_train_loss = np.mean(epoch_losses)
         logger.info(f"End of Epoch {epoch} Train - Avg Loss: {avg_train_loss:.4f}")
