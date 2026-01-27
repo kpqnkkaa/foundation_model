@@ -22,23 +22,54 @@ from gazelle.utils import gazefollow_auc, gazefollow_l2
 from pcgrad import PCGrad  # 确保安装: pip install pcgrad
 
 class MultiTaskLoss(nn.Module):
-    def __init__(self, num_tasks=4):
+    def __init__(self, num_tasks=4, anchor_task_idx=0):
         super().__init__()
-        # 初始化 4 个可学习参数 (对应 Heatmap, Seg, Direction, Text)
-        # log_vars = log(sigma^2)
-        self.log_vars = nn.Parameter(torch.zeros(num_tasks))
+        self.num_tasks = num_tasks
+        self.anchor_task_idx = anchor_task_idx
+        
+        # 我们只需要学习 (num_tasks - 1) 个参数
+        # 这里的 params 对应除了 anchor 以外的其他任务
+        self.log_vars_aux = nn.Parameter(torch.zeros(num_tasks - 1))
+        
+        # 计算让权重等于 1.0 所需要的 log_var 值
+        # Weight = 0.5 * exp(-log_var) = 1.0  =>  log_var = -ln(2)
+        self.fixed_log_var = -math.log(2.0) 
 
     def forward(self, input_losses):
         """
-        input_losses: list of tuples (loss_value, task_index)
-        task_index mapping: 0:Heatmap, 1:Seg, 2:Direction, 3:Text
+        input_losses: list of (loss, task_idx)
         """
         weighted_losses = []
-        for loss, idx in input_losses:
-            # 核心公式: Loss / (2*sigma^2) + log(sigma)
-            precision = torch.exp(-self.log_vars[idx])
-            weighted_loss = precision * loss + 0.5 * self.log_vars[idx]
+        
+        # 用于追踪当前用到第几个可学习参数
+        aux_idx = 0 
+        
+        # 我们需要根据 task_idx 重新排序 input_losses 或者在循环里判断
+        # 为了安全，建议直接按顺序遍历 losses_to_optimize
+        for loss, task_idx in input_losses:
+            
+            if task_idx == self.anchor_task_idx:
+                # === 主任务 (Heatmap) ===
+                # 强制使用固定权重 1.0
+                # L_weighted = 1.0 * Loss + const
+                # 注意：这里加上 0.5 * fixed_log_var 虽然是常数，但为了保持 Loss 量级一致建议保留
+                precision = 1.0
+                log_var = self.fixed_log_var
+                
+                # 这里的 Loss 直接保留原大小，梯度倍率为 1.0
+                weighted_loss = precision * loss + 0.5 * log_var
+                
+            else:
+                # === 辅助任务 (Seg, Dir, Text) ===
+                # 使用可学习的参数
+                current_log_var = self.log_vars_aux[aux_idx]
+                aux_idx += 1
+                
+                precision = torch.exp(-current_log_var)
+                weighted_loss = precision * loss + 0.5 * current_log_var
+            
             weighted_losses.append(weighted_loss)
+            
         return weighted_losses
 
 parser = argparse.ArgumentParser()
@@ -183,7 +214,7 @@ def main():
 
     model, transform = get_gazelle_model(args.model)
     model.cuda()
-    # mt_loss = MultiTaskLoss(num_tasks=4).cuda()
+    mt_loss = MultiTaskLoss(num_tasks=4, anchor_task_idx=0).cuda()
 
     # for param in model.backbone.parameters(): # freeze backbone
     #     param.requires_grad = False
@@ -232,9 +263,9 @@ def main():
     criterion_bce = nn.BCELoss() # 用于Heatmap和Seg
     criterion_ce = nn.CrossEntropyLoss(ignore_index=-1) # 用于Direction
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    # optimizer = torch.optim.Adam(list(model.parameters()) + list(mt_loss.parameters()), lr=args.lr)
-    # pcgrad = PCGrad(optimizer)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(list(model.parameters()) + list(mt_loss.parameters()), lr=args.lr)
+    pcgrad = PCGrad(optimizer)
     # optimizer = torch.optim.AdamW(param_dicts, lr=args.lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs, eta_min=1e-7)
 
@@ -258,22 +289,22 @@ def main():
             
             # gaze_point_expression_ids用于计算 Text Generation Loss (仅训练时需要)
             preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions.cuda(), "gaze_point_expression_ids": gaze_point_expressions.cuda()})
-            # losses_to_optimize = []
+            losses_to_optimize = []
 
             if isinstance(preds['heatmap'], list):
                  heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
             else:
                  heatmap_preds = preds['heatmap'].squeeze(dim=1)
 
-            loss = torch.tensor(0.0, device=heatmap_preds.device)
+            # loss = torch.tensor(0.0, device=heatmap_preds.device)
             heatmap_loss = criterion_bce(heatmap_preds, heatmaps.cuda())
-            loss += heatmap_loss
-            # losses_to_optimize.append((heatmap_loss, 0))
+            # loss += heatmap_loss
+            losses_to_optimize.append((heatmap_loss, 0))
 
             if preds['text_loss'] is not None:
                 text_loss = preds['text_loss']
-                loss += text_loss*0.01
-                # losses_to_optimize.append((text_loss, 3))
+                # loss += text_loss*0.01
+                losses_to_optimize.append((text_loss*0.01, 3))
             else:
                 text_loss = None
             
@@ -283,8 +314,8 @@ def main():
                 else:
                     preds['seg'] = preds['seg'].squeeze(dim=1)
                 seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
-                loss += seg_loss*0.1
-                # losses_to_optimize.append((seg_loss, 1))
+                # loss += seg_loss*0.1
+                losses_to_optimize.append((seg_loss, 1))
             else:
                 seg_loss = None
 
