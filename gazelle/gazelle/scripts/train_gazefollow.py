@@ -79,6 +79,7 @@ parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj
 parser.add_argument('--ckpt_save_dir', type=str, default='./experiments')
 parser.add_argument('--wandb_project', type=str, default=None)
 parser.add_argument('--exp_name', type=str, default="dinov2_vitb_multi_input_is_partial_input")
+parser.add_argument('--is_partial_input', default=False, action='store_true')
 parser.add_argument('--log_iter', type=int, default=10, help='how often to log loss during training')
 parser.add_argument('--max_epochs', type=int, default=15)
 parser.add_argument('--batch_size', type=int, default=60)
@@ -228,10 +229,10 @@ def main():
         print(f"Detected {torch.cuda.device_count()} GPUs. Using DataParallelWrapper.")
         model = DataParallelWrapper(model)
 
-    train_dataset = GazeDataset('gazefollow', args.data_path, 'train', transform)
+    train_dataset = GazeDataset('gazefollow', args.data_path, 'train', transform, is_partial_input=args.is_partial_input)
     train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, num_workers=args.n_workers)
     
-    eval_dataset = GazeDataset('gazefollow', args.data_path, 'test', transform)
+    eval_dataset = GazeDataset('gazefollow', args.data_path, 'test', transform, is_partial_input=args.is_partial_input)
     eval_dl = torch.utils.data.DataLoader(eval_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, num_workers=args.n_workers)
 
     # 在 main 函数中定义 optimizer
