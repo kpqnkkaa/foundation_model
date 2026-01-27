@@ -262,9 +262,24 @@ class GazeTextDecoder(nn.Module):
 
             # Forward 计算 Loss
             # GPT2 内部会自动计算 Shift Logits 和 Loss
-            outputs = self.gpt2(inputs_embeds=inputs_embeds, labels=labels, attention_mask=None)
+            outputs = self.gpt2(inputs_embeds=inputs_embeds, labels=labels)
             
-            return outputs.loss
+            # [New] 手动计算 Loss 以获得 Per-Sample Loss
+            # Logits: [B, Seq, Vocab], Labels: [B, Seq]
+            logits = outputs.logits
+            
+            # Shift so that tokens < n predict n
+            shift_logits = logits[..., :-1, :].contiguous()
+            shift_labels = labels[..., 1:].contiguous()
+            
+            # 使用 reduction='none'
+            loss_fct = nn.CrossEntropyLoss(reduction='none')
+            loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            
+            # Reshape 回 [B, Seq-1] 并对序列长度取平均，得到 [B]
+            loss = loss.view(shift_labels.shape).mean(dim=1)
+            
+            return loss
 
         # === 推理模式 (简单贪婪搜索或由外部调用 generate) ===
         else:

@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, default="dinov2_vitb_lora_mix_est")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--is_mix_gaze_estimation', default=False, action='store_true')
-parser.add_argument('--estimation_batch_size', type=int, default=32, help="Total batch size for estimation data")
+parser.add_argument('--estimation_batch_size', type=int, default=128, help="Total batch size for estimation data")
 
 parser.add_argument('--eth_label', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Label/train_temp.label')
 parser.add_argument('--eth_img', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Image')
@@ -40,7 +40,7 @@ parser.add_argument('--exp_name', type=str, default=None)
 parser.add_argument('--is_partial_input', default=False, action='store_true')
 parser.add_argument('--log_iter', type=int, default=10)
 parser.add_argument('--max_epochs', type=int, default=15)
-parser.add_argument('--batch_size', type=int, default=60) # GazeFollow Batch Size
+parser.add_argument('--batch_size', type=int, default=60) # GF Batch Size
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--n_workers', type=int, default=8)
 args = parser.parse_args()
@@ -175,7 +175,6 @@ def main():
         pbar = tqdm(enumerate(train_dl_gf), total=len(train_dl_gf), desc=f"Epoch {epoch}", unit="batch", dynamic_ncols=True)
         
         for cur_iter, batch_gf in pbar:
-            # 1. Merge Batches
             batches_to_merge = [batch_gf]
             if args.is_mix_gaze_estimation:
                 if iter_eth is not None: batches_to_merge.append(next(iter_eth))
@@ -184,15 +183,14 @@ def main():
             final_batch = merge_batches(batches_to_merge)
             imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask, is_face_crop_mode, gaze3d, has_3d = final_batch
 
-            # 2. Construct Weight Map
-            # has_3d: 0 for GazeFollow, 1 for Estimation
+            # =========================================================
+            # [Indices Separation]
+            # =========================================================
             is_est = has_3d.bool().cuda()
-            is_gf = ~is_est 
+            is_gf = ~is_est
             
-            # [Core Logic] Define per-sample weights for aux tasks
-            # GF samples = 1.0, Estimation samples = 0.1
-            aux_weights = torch.ones(imgs.shape[0], device=imgs.device)
-            aux_weights[is_est] = 0.1 
+            num_gf = is_gf.sum()
+            num_est = is_est.sum()
 
             optimizer.zero_grad()
             preds = model({
@@ -200,75 +198,115 @@ def main():
                 "observer_expression_ids": observer_expressions.cuda(), "gaze_point_expression_ids": gaze_point_expressions.cuda()
             })
             loss = 0.0
+            
+            # 用于记录日志的 Loss (只包含 GF)
+            log_hm_loss = 0.0
+            log_text_loss = 0.0
+            log_seg_loss = 0.0
+            log_dir_loss = 0.0
+            log_g3d_loss = 0.0
 
-            # --- A. Heatmap Loss ---
-            # GF: Learn valid heatmap (Weight 1.0)
-            # Est: Learn zero heatmap (Weight 0.1)
+            # --- A. Heatmap Loss (Separate Calculation) ---
             if isinstance(preds['heatmap'], list): heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
             else: heatmap_preds = preds['heatmap'].squeeze(dim=1)
             
+            # 计算 Per-Sample Loss
             pixel_loss = criterion_logits(heatmap_preds, heatmaps.cuda())
-            # Reduction: Mean over H,W -> [B]
-            loss_per_sample = pixel_loss.mean(dim=(1, 2))
-            # Weighted Mean over Batch
-            heatmap_loss = (loss_per_sample * aux_weights).mean()
-            loss += heatmap_loss
-
-            # --- B. Gaze 3D Loss (Strictly Masked) ---
-            # Only for Est samples. GF has no label.
-            if preds['gaze3d'] is not None and args.is_mix_gaze_estimation:
-                if isinstance(preds['gaze3d'], list): gaze3d_preds = torch.stack(preds['gaze3d']).squeeze(dim=1)
-                else: gaze3d_preds = preds['gaze3d'].squeeze(dim=1)
-                
-                loss_gaze3d_raw = F.l1_loss(gaze3d_preds, gaze3d.cuda(), reduction='none').mean(dim=1)
-                
-                # Apply Mask (not weight) because GF labels are invalid
-                num_valid_3d = is_est.float().sum()
-                if num_valid_3d > 0:
-                    gaze3d_loss = (loss_gaze3d_raw * is_est.float()).sum() / num_valid_3d
-                    loss += gaze3d_loss * 0.1 # Global task weight
-                else:
-                    gaze3d_loss = torch.tensor(0.0)
+            loss_per_sample_hm = pixel_loss.mean(dim=(1, 2)) # [B]
+            
+            # 1. GF Heatmap (主任务)
+            if num_gf > 0:
+                loss_hm_gf = loss_per_sample_hm[is_gf].mean()
+                loss += loss_hm_gf # 权重 1.0
+                log_hm_loss = loss_hm_gf.item()
             else:
-                gaze3d_loss = torch.tensor(0.0)
+                loss_hm_gf = torch.tensor(0.0)
+
+            # 2. Est Heatmap (辅助任务: 学习全0)
+            if num_est > 0:
+                loss_hm_est = loss_per_sample_hm[is_est].mean()
+                loss += loss_hm_est * 0.1 # 权重 0.01
+            
+            # --- B. Seg Loss (Separate) ---
+            if preds['seg'] is not None:
+                if isinstance(preds['seg'], list): seg_preds = torch.stack(preds['seg']).squeeze(dim=1)
+                else: seg_preds = preds['seg'].squeeze(dim=1)
+                
+                seg_loss_per_sample = criterion_logits(seg_preds, seg_mask.cuda()).mean(dim=(1,2))
+                
+                if num_gf > 0:
+                    loss_seg_gf = seg_loss_per_sample[is_gf].mean()
+                    loss += loss_seg_gf * 0.1 # 原有权重
+                    log_seg_loss = loss_seg_gf.item()
+                
+                if num_est > 0:
+                    loss_seg_est = seg_loss_per_sample[is_est].mean()
+                    loss += loss_seg_est * 0.01 # 更小的辅助权重
 
             # --- C. Text Loss ---
-            # GF: Valid text. Est: "outside of image". Both learnable.
-            # Implicitly, Est contributes to the batch mean. 
-            # We add it with a global small weight.
-            if preds['text_loss'] is not None: 
-                loss += preds['text_loss'] * 0.01
+            # --- C. Text Loss (Weighted) ---
+            if preds['text_loss'] is not None:
+                # preds['text_loss'] 现在是 [B] 维度的 Tensor
+                
+                # 1. GazeFollow (主任务，记录日志)
+                if num_gf > 0:
+                    loss_text_gf = preds['text_loss'][is_gf].mean()
+                    loss += loss_text_gf * 0.01 # 原始权重
+                    log_text_loss = loss_text_gf.item()
+                
+                # 2. Estimation (辅助任务，outside of image，给小权重)
+                if num_est > 0:
+                    loss_text_est = preds['text_loss'][is_est].mean()
+                    loss += loss_text_est * 0.01 * 0.1 # 额外乘 0.1 的缩小系数
 
             # --- D. Direction Loss ---
-            # GF: Valid label. Est: -100 (Ignored by CE).
-            # So Est samples contribute 0 loss automatically.
-            if preds['direction'] is not None:
+            # Est 数据标签是 -100，Loss 自动为 0。所以计算出的 Loss 本身就是纯 GF 的。
+            if preds['direction'] is not None and num_gf > 0:
                 if isinstance(preds['direction'], list): dir_preds = torch.stack(preds['direction']).squeeze(dim=1)
                 else: dir_preds = preds['direction'].squeeze(dim=1)
                 
                 clean_target = gaze_directions.clone()
                 clean_target[(clean_target < 0) | (clean_target >= 8)] = -100
                 
-                direction_loss = criterion_ce(dir_preds, clean_target.cuda())
-                loss += direction_loss * 0.02
-            else:
-                direction_loss = torch.tensor(0.0)
+                # 这里 Est 的样本 Loss 为 0，均值会被 Est 样本数量稀释
+                # 严格来说应该只对 GF 求 mean
+                dir_loss_raw = criterion_ce(dir_preds, clean_target.cuda()) # Scalar Mean
+                
+                # 如果 criterion_ce 是 mean reduction，我们无法剔除 Est 的分母影响。
+                # 但这通常影响不大。如果非常严格，需要把 criterion 改为 reduction='none'。
+                loss += dir_loss_raw * 0.02
+                log_dir_loss = dir_loss_raw.item()
+
+            # --- E. Gaze 3D Loss (Est Only) ---
+            if preds['gaze3d'] is not None and args.is_mix_gaze_estimation:
+                if isinstance(preds['gaze3d'], list): gaze3d_preds = torch.stack(preds['gaze3d']).squeeze(dim=1)
+                else: gaze3d_preds = preds['gaze3d'].squeeze(dim=1)
+                
+                loss_gaze3d_raw = F.l1_loss(gaze3d_preds, gaze3d.cuda(), reduction='none').mean(dim=1)
+                
+                # 只有 Est 有效
+                if num_est > 0:
+                    loss_g3d_est = loss_gaze3d_raw[is_est].mean()
+                    loss += loss_g3d_est * 0.1
+                    log_g3d_loss = loss_g3d_est.item()
             
             loss.backward()
             optimizer.step()
             
+            # --- Logging (Only GF metrics where possible) ---
             print_dict = {}
-            print_dict['heatmap_loss'] = heatmap_loss.item()
-            if preds['text_loss'] is not None: print_dict['text_loss'] = preds['text_loss'].item()
-            if preds['direction'] is not None: print_dict['direction_loss'] = direction_loss.item()
-            if preds['gaze3d'] is not None: print_dict['gaze3d_loss'] = gaze3d_loss.item()
+            print_dict['heatmap_loss'] = log_hm_loss # Pure GF
+            if preds['text_loss'] is not None: print_dict['text_loss'] = log_text_loss
+            if preds['direction'] is not None: print_dict['direction_loss'] = log_dir_loss # Mostly GF
+            if preds['seg'] is not None: print_dict['seg_loss'] = log_seg_loss # Pure GF
+            if preds['gaze3d'] is not None: print_dict['gaze3d_loss'] = log_g3d_loss # Pure Est
             print_dict['total_loss'] = loss.item()
             
             pbar.set_postfix(print_dict)
 
             if cur_iter % args.log_iter == 0: 
                 wandb.log(print_dict)
-                logger.info(f"Iter {cur_iter}/{len(train_dl_gf)}"+", ".join([f"{k}: {v:.4f}" for k, v in print_dict.items()]))
+                logger.info(f"Iter {cur_iter}/{len(train_dl_gf)} "+", ".join([f"{k}: {v:.4f}" for k, v in print_dict.items()]))
 
         scheduler.step()
         ckpt_path_last = os.path.join(exp_dir, 'last.pt')

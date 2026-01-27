@@ -1,0 +1,32 @@
+2026-01-27 22:06:48,826 - Experiment Config: {'model': 'dinov2_vitb_lora_mix_est', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'is_mix_gaze_estimation': True, 'estimation_batch_size': 32, 'eth_label': '/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Label/train_temp.label', 'eth_img': '/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Image', 'gaze360_label': '/mnt/nvme1n1/lululemon/xjj/datasets/Gaze360/Label/train.label', 'gaze360_img': '/mnt/nvme1n1/lululemon/xjj/datasets/Gaze360/Image', 'ckpt_save_dir': './experiments', 'wandb_project': 'dinov2_vitb_lora_mix_est', 'exp_name': 'dinov2_vitb_lora_mix_est', 'is_partial_input': False, 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
+2026-01-27 22:06:48,826 - Initializing Model with Mix Gaze Estimation Mode
+2026-01-27 22:06:57,521 - Loading ETH and Gaze360 Datasets as separate streams...
+2026-01-27 22:07:12,764 - Iter 0/1891 heatmap_loss: 0.7384, gaze3d_loss: 0.6841, total_loss: 0.8818
+2026-01-27 22:07:28,483 - Iter 10/1891 heatmap_loss: 0.0590, gaze3d_loss: 0.4078, total_loss: 0.0999
+2026-01-27 22:07:44,728 - Iter 20/1891 heatmap_loss: 0.0645, gaze3d_loss: 0.4134, total_loss: 0.1059
+2026-01-27 22:08:00,761 - Iter 30/1891 heatmap_loss: 0.0522, gaze3d_loss: 0.3778, total_loss: 0.0901
+2026-01-27 22:08:17,976 - Iter 40/1891 heatmap_loss: 0.0426, gaze3d_loss: 0.3317, total_loss: 0.0759
+2026-01-27 22:08:34,151 - Iter 50/1891 heatmap_loss: 0.0467, gaze3d_loss: 0.3452, total_loss: 0.0813
+2026-01-27 22:08:50,189 - Iter 60/1891 heatmap_loss: 0.0438, gaze3d_loss: 0.2849, total_loss: 0.0724
+2026-01-27 22:09:03,081 - Iter 70/1891 heatmap_loss: 0.0507, gaze3d_loss: 0.3277, total_loss: 0.0836
+2026-01-27 22:09:15,949 - Iter 80/1891 heatmap_loss: 0.0474, gaze3d_loss: 0.2120, total_loss: 0.0687
+2026-01-27 22:09:29,052 - Iter 90/1891 heatmap_loss: 0.0507, gaze3d_loss: 0.2728, total_loss: 0.0781
+2026-01-27 22:09:42,274 - Iter 100/1891 heatmap_loss: 0.0416, gaze3d_loss: 0.2393, total_loss: 0.0655
+2026-01-27 22:09:55,074 - Iter 110/1891 heatmap_loss: 0.0480, gaze3d_loss: 0.2420, total_loss: 0.0723
+2026-01-27 22:10:08,327 - Iter 120/1891 heatmap_loss: 0.0425, gaze3d_loss: 0.2353, total_loss: 0.0661
+2026-01-27 22:10:21,607 - Iter 130/1891 heatmap_loss: 0.0458, gaze3d_loss: 0.2266, total_loss: 0.0685
+2026-01-27 22:10:35,193 - Iter 140/1891 heatmap_loss: 0.0460, gaze3d_loss: 0.2435, total_loss: 0.0704
+2026-01-27 22:10:48,376 - Iter 150/1891 heatmap_loss: 0.0454, gaze3d_loss: 0.2364, total_loss: 0.0691
+2026-01-27 22:11:01,220 - Iter 160/1891 heatmap_loss: 0.0446, gaze3d_loss: 0.2234, total_loss: 0.0670
+2026-01-27 22:11:14,397 - Iter 170/1891 heatmap_loss: 0.0437, gaze3d_loss: 0.2354, total_loss: 0.0673
+2026-01-27 22:11:27,772 - Iter 180/1891 heatmap_loss: 0.0446, gaze3d_loss: 0.1885, total_loss: 0.0635
+2026-01-27 22:11:40,620 - Iter 190/1891 heatmap_loss: 0.0393, gaze3d_loss: 0.2345, total_loss: 0.0628
+2026-01-27 22:11:54,172 - Iter 200/1891 heatmap_loss: 0.0455, gaze3d_loss: 0.1933, total_loss: 0.0648
+2026-01-27 22:12:07,226 - Iter 210/1891 heatmap_loss: 0.0469, gaze3d_loss: 0.1802, total_loss: 0.0649
+2026-01-27 22:12:20,264 - Iter 220/1891 heatmap_loss: 0.0490, gaze3d_loss: 0.1890, total_loss: 0.0680
+2026-01-27 22:12:33,255 - Iter 230/1891 heatmap_loss: 0.0468, gaze3d_loss: 0.2060, total_loss: 0.0674
+2026-01-27 22:12:46,626 - Iter 240/1891 heatmap_loss: 0.0423, gaze3d_loss: 0.1938, total_loss: 0.0617
+2026-01-27 22:12:59,317 - Iter 250/1891 heatmap_loss: 0.0432, gaze3d_loss: 0.1468, total_loss: 0.0579
+2026-01-27 22:13:12,712 - Iter 260/1891 heatmap_loss: 0.0463, gaze3d_loss: 0.1686, total_loss: 0.0632
+2026-01-27 22:13:28,975 - Iter 270/1891 heatmap_loss: 0.0505, gaze3d_loss: 0.2143, total_loss: 0.0719
+2026-01-27 22:13:44,948 - Iter 280/1891 heatmap_loss: 0.0447, gaze3d_loss: 0.2017, total_loss: 0.0649
