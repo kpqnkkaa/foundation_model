@@ -9,6 +9,7 @@ import wandb
 import logging
 from tqdm import tqdm
 import cv2
+import math
 cv2.setNumThreads(0) # 禁止 OpenCV 多线程，防止死锁
 cv2.ocl.setUseOpenCL(False)
 
@@ -304,7 +305,7 @@ def main():
             if preds['text_loss'] is not None:
                 text_loss = preds['text_loss']
                 # loss += text_loss*0.01
-                losses_to_optimize.append((text_loss*0.01, 3))
+                losses_to_optimize.append((text_loss, 3))
             else:
                 text_loss = None
             
@@ -325,15 +326,15 @@ def main():
                 else:
                     preds['direction'] = preds['direction'].squeeze(dim=1)
                 direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
-                loss += direction_loss*0.02
-                # losses_to_optimize.append((direction_loss, 2))
+                # loss += direction_loss*0.02
+                losses_to_optimize.append((direction_loss, 2))
             else:
                 direction_loss = None
 
-            # weighted_losses = mt_loss(losses_to_optimize)
-            # pcgrad.pc_backward(weighted_losses)
-            # loss = sum(weighted_losses)
-            loss.backward()
+            weighted_losses = mt_loss(losses_to_optimize)
+            pcgrad.pc_backward(weighted_losses)
+            loss = sum(weighted_losses)
+            # loss.backward()
             optimizer.step()
             
             epoch_losses.append(heatmap_loss.item())

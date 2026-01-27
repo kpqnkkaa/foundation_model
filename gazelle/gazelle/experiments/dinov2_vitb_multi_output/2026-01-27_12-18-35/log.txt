@@ -187,3 +187,20 @@
 2026-01-27 12:53:12,389 - Iter 1820/1891, heatmap Loss=0.0501, Text Loss=1.7572, Seg Loss=0.1938, Direction Loss=1.1342, Loss=0.1097
 2026-01-27 12:53:23,435 - Iter 1830/1891, heatmap Loss=0.0478, Text Loss=1.5803, Seg Loss=0.1203, Direction Loss=1.3029, Loss=0.1017
 2026-01-27 12:53:34,708 - Iter 1840/1891, heatmap Loss=0.0494, Text Loss=1.5547, Seg Loss=0.1787, Direction Loss=1.3004, Loss=0.1089
+2026-01-27 12:53:45,823 - Iter 1850/1891, heatmap Loss=0.0520, Text Loss=1.5184, Seg Loss=0.1728, Direction Loss=1.3252, Loss=0.1110
+2026-01-27 12:53:56,526 - Iter 1860/1891, heatmap Loss=0.0482, Text Loss=1.4439, Seg Loss=0.1191, Direction Loss=1.3154, Loss=0.1009
+2026-01-27 12:54:08,255 - Iter 1870/1891, heatmap Loss=0.0485, Text Loss=1.4780, Seg Loss=0.1738, Direction Loss=1.2529, Loss=0.1058
+2026-01-27 12:54:20,205 - Iter 1880/1891, heatmap Loss=0.0481, Text Loss=1.6896, Seg Loss=0.1098, Direction Loss=1.0830, Loss=0.0976
+2026-01-27 12:54:31,244 - Iter 1890/1891, heatmap Loss=0.0536, Text Loss=1.4734, Seg Loss=0.2127, Direction Loss=1.2547, Loss=0.1147
+2026-01-27 12:54:31,433 - End of Epoch 0 Train - Avg Loss: 0.0522
+2026-01-27 12:54:32,406 - Saved last checkpoint to ./experiments/dinov2_vitb_multi_output/2026-01-27_12-18-35/last.pt
+2026-01-27 12:54:32,407 - [Epoch 0 Evaluation]
+2026-01-27 12:58:43,519 - EVAL EPOCH 0: AUC=0.9385, Min L2=0.0717, Avg L2=0.1351
+2026-01-27 12:58:44,473 - New best performance! Saved best checkpoint to ./experiments/dinov2_vitb_multi_output/2026-01-27_12-18-35/best.pt
+2026-01-27 12:58:44,475 - 
+[Epoch 1 Training]
+2026-01-27 12:58:47,025 - Iter 0/1891, heatmap Loss=0.0470, Text Loss=1.6406, Seg Loss=0.1623, Direction Loss=1.1100, Loss=0.1019
+2026-01-27 12:58:58,283 - Iter 10/1891, heatmap Loss=0.0493, Text Loss=1.6133, Seg Loss=0.1576, Direction Loss=1.0967, Loss=0.1032
+2026-01-27 12:59:09,809 - Iter 20/1891, heatmap Loss=0.0469, Text Loss=1.6689, Seg Loss=0.1340, Direction Loss=1.1657, Loss=0.1003
+2026-01-27 12:59:20,922 - Iter 30/1891, heatmap Loss=0.0506, Text Loss=1.7747, Seg Loss=0.1335, Direction Loss=1.0131, Loss=0.1019
+2026-01-27 12:59:32,773 - Iter 40/1891, heatmap Loss=0.0456, Text Loss=1.5768, Seg Loss=0.1242, Direction Loss=1.3970, Loss=0.1017
