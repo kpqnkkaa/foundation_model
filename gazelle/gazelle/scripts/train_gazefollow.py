@@ -257,19 +257,22 @@ def main():
             
             # gaze_point_expression_ids用于计算 Text Generation Loss (仅训练时需要)
             preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions.cuda(), "gaze_point_expression_ids": gaze_point_expressions.cuda()})
-            
+            losses_to_optimize = []
+
             if isinstance(preds['heatmap'], list):
                  heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
             else:
                  heatmap_preds = preds['heatmap'].squeeze(dim=1)
 
-            loss = torch.tensor(0.0, device=heatmap_preds.device)
+            # loss = torch.tensor(0.0, device=heatmap_preds.device)
             heatmap_loss = criterion_bce(heatmap_preds, heatmaps.cuda())
-            loss += heatmap_loss
+            # loss += heatmap_loss
+            losses_to_optimize.append((heatmap_loss, 0))
 
             if preds['text_loss'] is not None:
                 text_loss = preds['text_loss']
-                loss += text_loss*0.01
+                # loss += text_loss*0.01
+                losses_to_optimize.append((text_loss, 3))
             else:
                 text_loss = None
             
@@ -279,7 +282,8 @@ def main():
                 else:
                     preds['seg'] = preds['seg'].squeeze(dim=1)
                 seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
-                loss += seg_loss*0.1
+                #   loss += seg_loss*0.1
+                losses_to_optimize.append((seg_loss, 1))
             else:
                 seg_loss = None
 
@@ -289,11 +293,14 @@ def main():
                 else:
                     preds['direction'] = preds['direction'].squeeze(dim=1)
                 direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
-                loss += direction_loss*0.02
+                # loss += direction_loss*0.02
+                losses_to_optimize.append((direction_loss, 2))
             else:
                 direction_loss = None
 
-            loss.backward()
+            loss = mt_loss(losses_to_optimize)
+            optimizer.pc_backward(loss)
+            # loss.backward()
             optimizer.step()
             
             epoch_losses.append(heatmap_loss.item())
