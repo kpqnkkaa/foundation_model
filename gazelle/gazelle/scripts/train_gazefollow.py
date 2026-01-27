@@ -183,7 +183,7 @@ def main():
 
     model, transform = get_gazelle_model(args.model)
     model.cuda()
-    mt_loss = MultiTaskLoss(num_tasks=4).cuda()
+    # mt_loss = MultiTaskLoss(num_tasks=4).cuda()
 
     # for param in model.backbone.parameters(): # freeze backbone
     #     param.requires_grad = False
@@ -232,8 +232,9 @@ def main():
     criterion_bce = nn.BCELoss() # 用于Heatmap和Seg
     criterion_ce = nn.CrossEntropyLoss(ignore_index=-1) # 用于Direction
     
-    optimizer = torch.optim.Adam(list(model.parameters()) + list(mt_loss.parameters()), lr=args.lr)
-    pcgrad = PCGrad(optimizer)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    # optimizer = torch.optim.Adam(list(model.parameters()) + list(mt_loss.parameters()), lr=args.lr)
+    # pcgrad = PCGrad(optimizer)
     # optimizer = torch.optim.AdamW(param_dicts, lr=args.lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs, eta_min=1e-7)
 
@@ -257,22 +258,22 @@ def main():
             
             # gaze_point_expression_ids用于计算 Text Generation Loss (仅训练时需要)
             preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions.cuda(), "gaze_point_expression_ids": gaze_point_expressions.cuda()})
-            losses_to_optimize = []
+            # losses_to_optimize = []
 
             if isinstance(preds['heatmap'], list):
                  heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
             else:
                  heatmap_preds = preds['heatmap'].squeeze(dim=1)
 
-            # loss = torch.tensor(0.0, device=heatmap_preds.device)
+            loss = torch.tensor(0.0, device=heatmap_preds.device)
             heatmap_loss = criterion_bce(heatmap_preds, heatmaps.cuda())
-            # loss += heatmap_loss
-            losses_to_optimize.append((heatmap_loss, 0))
+            loss += heatmap_loss
+            # losses_to_optimize.append((heatmap_loss, 0))
 
             if preds['text_loss'] is not None:
                 text_loss = preds['text_loss']
-                # loss += text_loss*0.01
-                losses_to_optimize.append((text_loss, 3))
+                loss += text_loss*0.01
+                # losses_to_optimize.append((text_loss, 3))
             else:
                 text_loss = None
             
@@ -282,8 +283,8 @@ def main():
                 else:
                     preds['seg'] = preds['seg'].squeeze(dim=1)
                 seg_loss = criterion_bce(preds['seg'], seg_mask.cuda())
-                #   loss += seg_loss*0.1
-                losses_to_optimize.append((seg_loss, 1))
+                loss += seg_loss*0.1
+                # losses_to_optimize.append((seg_loss, 1))
             else:
                 seg_loss = None
 
@@ -293,16 +294,16 @@ def main():
                 else:
                     preds['direction'] = preds['direction'].squeeze(dim=1)
                 direction_loss = criterion_ce(preds['direction'], gaze_directions.cuda())
-                # loss += direction_loss*0.02
-                losses_to_optimize.append((direction_loss, 2))
+                loss += direction_loss*0.02
+                # losses_to_optimize.append((direction_loss, 2))
             else:
                 direction_loss = None
 
-            weighted_losses = mt_loss(losses_to_optimize)
-            pcgrad.pc_backward(weighted_losses)
-            # loss.backward()
+            # weighted_losses = mt_loss(losses_to_optimize)
+            # pcgrad.pc_backward(weighted_losses)
+            # loss = sum(weighted_losses)
+            loss.backward()
             optimizer.step()
-            loss = sum(weighted_losses)
             
             epoch_losses.append(heatmap_loss.item())
 
