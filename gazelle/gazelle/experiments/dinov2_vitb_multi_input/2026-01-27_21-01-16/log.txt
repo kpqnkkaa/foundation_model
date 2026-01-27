@@ -1,0 +1,11 @@
+2026-01-27 21:01:16,503 - Experiment Config: {'model': 'dinov2_vitb_multi_input', 'data_path': '/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended', 'is_mix_gaze_estimation': False, 'eth_label': '/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Label/train_temp.label', 'eth_img': '/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Image', 'gaze360_label': '/mnt/nvme1n1/lululemon/xjj/datasets/Gaze360/Label/train.label', 'gaze360_img': '/mnt/nvme1n1/lululemon/xjj/datasets/Gaze360/Image', 'ckpt_save_dir': './experiments', 'wandb_project': 'dinov2_vitb_multi_input', 'exp_name': 'dinov2_vitb_multi_input', 'is_partial_input': True, 'log_iter': 10, 'max_epochs': 15, 'batch_size': 60, 'lr': 0.001, 'n_workers': 8}
+2026-01-27 21:01:33,114 - heatmap_loss: 0.6594, total_loss: 0.6594
+2026-01-27 21:01:33,942 - heatmap_loss: 0.0920, total_loss: 0.0920
+2026-01-27 21:01:34,673 - heatmap_loss: 0.1070, total_loss: 0.1070
+2026-01-27 21:01:35,346 - heatmap_loss: 0.1392, total_loss: 0.1392
+2026-01-27 21:01:36,212 - heatmap_loss: 0.1164, total_loss: 0.1164
+2026-01-27 21:01:37,034 - heatmap_loss: 0.0698, total_loss: 0.0698
+2026-01-27 21:01:37,837 - heatmap_loss: 0.2730, total_loss: 0.2730
+2026-01-27 21:01:38,500 - heatmap_loss: 0.0679, total_loss: 0.0679
+2026-01-27 21:01:39,373 - heatmap_loss: 0.1111, total_loss: 0.1111
+2026-01-27 21:01:40,039 - heatmap_loss: 0.1421, total_loss: 0.1421

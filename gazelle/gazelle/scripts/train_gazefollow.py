@@ -34,7 +34,7 @@ parser.add_argument('--gaze360_label', type=str, default='/mnt/nvme1n1/lululemon
 parser.add_argument('--gaze360_img', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/Gaze360/Image')
 parser.add_argument('--ckpt_save_dir', type=str, default='./experiments')
 parser.add_argument('--wandb_project', type=str, default=None)
-parser.add_argument('--exp_name', type=str, default="dinov2_vitb_multi_input_mix_est")
+parser.add_argument('--exp_name', type=str, default=None)
 parser.add_argument('--is_partial_input', default=False, action='store_true')
 parser.add_argument('--log_iter', type=int, default=10)
 parser.add_argument('--max_epochs', type=int, default=15)
@@ -185,7 +185,16 @@ def main():
             
             loss.backward()
             optimizer.step()
-            pbar.set_postfix({'loss': f"{loss.item():.4f}", 'hm': f"{heatmap_loss.item():.4f}", 'g3d': f"{gaze3d_loss.item():.4f}"})
+            print_str = f"heatmap_loss: {heatmap_loss.item():.4f}"
+            if preds['text_loss'] is not None:
+                print_str += f", text_loss: {preds['text_loss'].item():.4f}"
+            if preds['direction'] is not None:
+                print_str += f", direction_loss: {direction_loss.item():.4f}"
+            if preds['gaze3d'] is not None:
+                print_str += f", gaze3d_loss: {gaze3d_loss.item():.4f}"
+            print_str += f", total_loss: {loss.item():.4f}"
+            logger.info(print_str)
+            pbar.set_description(print_str)
             if cur_iter % args.log_iter == 0: wandb.log({"train/loss": loss.item(), "train/heatmap_loss": heatmap_loss.item(), "train/gaze3d_loss": gaze3d_loss.item()})
 
         scheduler.step()
