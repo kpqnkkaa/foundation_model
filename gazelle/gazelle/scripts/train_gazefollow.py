@@ -143,7 +143,7 @@ def main():
     model.cuda()
     if torch.cuda.device_count() > 1: model = DataParallelWrapper(model)
 
-    gazefollow_train = GazeDataset('gazefollow', args.data_path, 'train', transform, is_partial_input=args.is_partial_input, is_mix_gaze_estimation=args.is_mix_gaze_estimation)
+    gazefollow_train = GazeDataset('gazefollow', args.data_path, 'train', transform, is_partial_input=args.is_partial_input)
     train_dl_gf = torch.utils.data.DataLoader(gazefollow_train, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, num_workers=args.n_workers)
     
     iter_eth = None
@@ -328,7 +328,9 @@ def main():
                 avg_l2, min_l2 = gazefollow_l2(heatmap_preds[i], gazex[i], gazey[i])
                 aucs.append(auc); avg_l2s.append(avg_l2); min_l2s.append(min_l2)
         epoch_min_l2 = np.mean(min_l2s)
-        logger.info(f"Eval Epoch {epoch}: Min L2={epoch_min_l2:.4f}")
+        epoch_avg_l2 = np.mean(avg_l2s)
+        epoch_auc = np.mean(aucs)
+        logger.info(f"Eval Epoch {epoch}: Min L2={epoch_min_l2:.4f}, Avg L2={epoch_avg_l2:.4f}, AUC={epoch_auc:.4f}")
         if epoch_min_l2 < best_min_l2:
             best_min_l2 = epoch_min_l2
             torch.save(model_to_save.get_gazelle_state_dict(), os.path.join(exp_dir, 'best.pt'))
