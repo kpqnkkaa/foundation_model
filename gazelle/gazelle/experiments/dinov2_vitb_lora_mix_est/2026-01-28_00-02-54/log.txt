@@ -2091,3 +2091,24 @@
 2026-01-28 12:39:18,366 - Iter 1670/1891 heatmap_loss: 0.0474, gaze3d_loss: 0.0752, total_loss: 0.0550
 2026-01-28 12:39:43,763 - Iter 1680/1891 heatmap_loss: 0.0459, gaze3d_loss: 0.0792, total_loss: 0.0538
 2026-01-28 12:40:09,003 - Iter 1690/1891 heatmap_loss: 0.0473, gaze3d_loss: 0.0760, total_loss: 0.0549
+2026-01-28 12:40:33,659 - Iter 1700/1891 heatmap_loss: 0.0458, gaze3d_loss: 0.0824, total_loss: 0.0540
+2026-01-28 12:40:58,597 - Iter 1710/1891 heatmap_loss: 0.0439, gaze3d_loss: 0.1063, total_loss: 0.0545
+2026-01-28 12:41:23,261 - Iter 1720/1891 heatmap_loss: 0.0446, gaze3d_loss: 0.0753, total_loss: 0.0521
+2026-01-28 12:41:48,026 - Iter 1730/1891 heatmap_loss: 0.0408, gaze3d_loss: 0.0743, total_loss: 0.0482
+2026-01-28 12:42:12,978 - Iter 1740/1891 heatmap_loss: 0.0442, gaze3d_loss: 0.0956, total_loss: 0.0537
+2026-01-28 12:42:37,418 - Iter 1750/1891 heatmap_loss: 0.0448, gaze3d_loss: 0.0910, total_loss: 0.0539
+2026-01-28 12:43:03,043 - Iter 1760/1891 heatmap_loss: 0.0466, gaze3d_loss: 0.0838, total_loss: 0.0549
+2026-01-28 12:43:27,309 - Iter 1770/1891 heatmap_loss: 0.0416, gaze3d_loss: 0.0691, total_loss: 0.0485
+2026-01-28 12:43:52,337 - Iter 1780/1891 heatmap_loss: 0.0405, gaze3d_loss: 0.0812, total_loss: 0.0486
+2026-01-28 12:44:17,288 - Iter 1790/1891 heatmap_loss: 0.0453, gaze3d_loss: 0.0848, total_loss: 0.0538
+2026-01-28 12:44:42,154 - Iter 1800/1891 heatmap_loss: 0.0456, gaze3d_loss: 0.0937, total_loss: 0.0550
+2026-01-28 12:45:06,574 - Iter 1810/1891 heatmap_loss: 0.0444, gaze3d_loss: 0.0879, total_loss: 0.0532
+2026-01-28 12:45:31,325 - Iter 1820/1891 heatmap_loss: 0.0460, gaze3d_loss: 0.0707, total_loss: 0.0531
+2026-01-28 12:45:56,447 - Iter 1830/1891 heatmap_loss: 0.0414, gaze3d_loss: 0.0743, total_loss: 0.0488
+2026-01-28 12:46:21,350 - Iter 1840/1891 heatmap_loss: 0.0463, gaze3d_loss: 0.0833, total_loss: 0.0547
+2026-01-28 12:46:46,260 - Iter 1850/1891 heatmap_loss: 0.0434, gaze3d_loss: 0.0688, total_loss: 0.0503
+2026-01-28 12:47:11,839 - Iter 1860/1891 heatmap_loss: 0.0434, gaze3d_loss: 0.0783, total_loss: 0.0513
+2026-01-28 12:47:36,353 - Iter 1870/1891 heatmap_loss: 0.0441, gaze3d_loss: 0.0850, total_loss: 0.0526
+2026-01-28 12:48:00,828 - Iter 1880/1891 heatmap_loss: 0.0437, gaze3d_loss: 0.0900, total_loss: 0.0527
+2026-01-28 12:48:25,675 - Iter 1890/1891 heatmap_loss: 0.0488, gaze3d_loss: 0.1007, total_loss: 0.0588
+2026-01-28 12:48:27,663 - [Epoch 10 Evaluation]
