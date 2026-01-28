@@ -2863,3 +2863,21 @@
 2026-01-28 18:13:19,657 - Iter 1710/1891 heatmap_loss: 0.0465, gaze3d_loss: 0.0758, total_loss: 0.0541
 2026-01-28 18:13:44,232 - Iter 1720/1891 heatmap_loss: 0.0450, gaze3d_loss: 0.0659, total_loss: 0.0516
 2026-01-28 18:14:09,020 - Iter 1730/1891 heatmap_loss: 0.0466, gaze3d_loss: 0.0648, total_loss: 0.0531
+2026-01-28 18:14:34,015 - Iter 1740/1891 heatmap_loss: 0.0388, gaze3d_loss: 0.0694, total_loss: 0.0457
+2026-01-28 18:14:59,077 - Iter 1750/1891 heatmap_loss: 0.0464, gaze3d_loss: 0.0604, total_loss: 0.0524
+2026-01-28 18:15:24,079 - Iter 1760/1891 heatmap_loss: 0.0382, gaze3d_loss: 0.0550, total_loss: 0.0437
+2026-01-28 18:15:48,645 - Iter 1770/1891 heatmap_loss: 0.0419, gaze3d_loss: 0.0892, total_loss: 0.0509
+2026-01-28 18:16:13,760 - Iter 1780/1891 heatmap_loss: 0.0444, gaze3d_loss: 0.0700, total_loss: 0.0514
+2026-01-28 18:16:39,229 - Iter 1790/1891 heatmap_loss: 0.0422, gaze3d_loss: 0.0653, total_loss: 0.0487
+2026-01-28 18:17:03,685 - Iter 1800/1891 heatmap_loss: 0.0461, gaze3d_loss: 0.0816, total_loss: 0.0542
+2026-01-28 18:17:28,367 - Iter 1810/1891 heatmap_loss: 0.0443, gaze3d_loss: 0.0764, total_loss: 0.0520
+2026-01-28 18:17:54,036 - Iter 1820/1891 heatmap_loss: 0.0475, gaze3d_loss: 0.0702, total_loss: 0.0545
+2026-01-28 18:18:18,367 - Iter 1830/1891 heatmap_loss: 0.0434, gaze3d_loss: 0.0721, total_loss: 0.0507
+2026-01-28 18:18:43,659 - Iter 1840/1891 heatmap_loss: 0.0426, gaze3d_loss: 0.0850, total_loss: 0.0511
+2026-01-28 18:19:07,900 - Iter 1850/1891 heatmap_loss: 0.0449, gaze3d_loss: 0.0959, total_loss: 0.0545
+2026-01-28 18:19:32,923 - Iter 1860/1891 heatmap_loss: 0.0453, gaze3d_loss: 0.0763, total_loss: 0.0530
+2026-01-28 18:19:58,498 - Iter 1870/1891 heatmap_loss: 0.0452, gaze3d_loss: 0.0897, total_loss: 0.0542
+2026-01-28 18:20:23,239 - Iter 1880/1891 heatmap_loss: 0.0436, gaze3d_loss: 0.0770, total_loss: 0.0513
+2026-01-28 18:20:48,213 - Iter 1890/1891 heatmap_loss: 0.0473, gaze3d_loss: 0.0687, total_loss: 0.0542
+2026-01-28 18:20:50,083 - [Epoch 14 Evaluation]
+2026-01-28 18:25:22,574 - Eval Epoch 14: Min L2=0.0982, Avg L2=0.1624, AUC=0.9368
