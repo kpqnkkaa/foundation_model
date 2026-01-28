@@ -1518,3 +1518,24 @@
 2026-01-28 08:31:44,268 - Iter 1700/1891 heatmap_loss: 0.0479, gaze3d_loss: 0.0840, total_loss: 0.0563
 2026-01-28 08:32:09,084 - Iter 1710/1891 heatmap_loss: 0.0485, gaze3d_loss: 0.1031, total_loss: 0.0588
 2026-01-28 08:32:34,034 - Iter 1720/1891 heatmap_loss: 0.0504, gaze3d_loss: 0.0955, total_loss: 0.0600
+2026-01-28 08:32:59,033 - Iter 1730/1891 heatmap_loss: 0.0482, gaze3d_loss: 0.0883, total_loss: 0.0571
+2026-01-28 08:33:22,936 - Iter 1740/1891 heatmap_loss: 0.0444, gaze3d_loss: 0.0887, total_loss: 0.0533
+2026-01-28 08:33:46,854 - Iter 1750/1891 heatmap_loss: 0.0453, gaze3d_loss: 0.0957, total_loss: 0.0549
+2026-01-28 08:34:11,925 - Iter 1760/1891 heatmap_loss: 0.0467, gaze3d_loss: 0.0768, total_loss: 0.0544
+2026-01-28 08:34:37,109 - Iter 1770/1891 heatmap_loss: 0.0456, gaze3d_loss: 0.0807, total_loss: 0.0536
+2026-01-28 08:35:02,147 - Iter 1780/1891 heatmap_loss: 0.0424, gaze3d_loss: 0.0913, total_loss: 0.0516
+2026-01-28 08:35:27,776 - Iter 1790/1891 heatmap_loss: 0.0438, gaze3d_loss: 0.0998, total_loss: 0.0537
+2026-01-28 08:35:52,478 - Iter 1800/1891 heatmap_loss: 0.0478, gaze3d_loss: 0.0953, total_loss: 0.0573
+2026-01-28 08:36:16,876 - Iter 1810/1891 heatmap_loss: 0.0482, gaze3d_loss: 0.1092, total_loss: 0.0591
+2026-01-28 08:36:41,027 - Iter 1820/1891 heatmap_loss: 0.0413, gaze3d_loss: 0.1195, total_loss: 0.0533
+2026-01-28 08:37:05,675 - Iter 1830/1891 heatmap_loss: 0.0443, gaze3d_loss: 0.1130, total_loss: 0.0556
+2026-01-28 08:37:30,199 - Iter 1840/1891 heatmap_loss: 0.0470, gaze3d_loss: 0.0812, total_loss: 0.0551
+2026-01-28 08:37:54,669 - Iter 1850/1891 heatmap_loss: 0.0474, gaze3d_loss: 0.0851, total_loss: 0.0559
+2026-01-28 08:38:19,073 - Iter 1860/1891 heatmap_loss: 0.0435, gaze3d_loss: 0.1039, total_loss: 0.0539
+2026-01-28 08:38:43,946 - Iter 1870/1891 heatmap_loss: 0.0495, gaze3d_loss: 0.0902, total_loss: 0.0586
+2026-01-28 08:39:08,120 - Iter 1880/1891 heatmap_loss: 0.0466, gaze3d_loss: 0.0834, total_loss: 0.0550
+2026-01-28 08:39:33,167 - Iter 1890/1891 heatmap_loss: 0.0424, gaze3d_loss: 0.1028, total_loss: 0.0526
+2026-01-28 08:39:35,120 - [Epoch 7 Evaluation]
+2026-01-28 08:44:04,155 - Eval Epoch 7: Min L2=0.0999, Avg L2=0.1647, AUC=0.9359
+2026-01-28 08:44:09,846 - Iter 0/1891 heatmap_loss: 0.0432, gaze3d_loss: 0.0966, total_loss: 0.0529
+2026-01-28 08:44:34,629 - Iter 10/1891 heatmap_loss: 0.0446, gaze3d_loss: 0.1007, total_loss: 0.0547
