@@ -382,18 +382,33 @@ class GazeLLE(nn.Module):
             seg_map = F.interpolate(seg_map, size=self.out_size, mode='bilinear', align_corners=False)
             seg_map = seg_map.squeeze(1)
             output_dict["seg"] = utils.split_tensors(seg_map, num_ppl_per_img)
-            
+
             # 2. Text Output
-            # 将 Gaze Embedding 融合进 Text Token，作为 Condition (如果启用了引导)
+            # 准备文本输入特征 (考虑 Gaze Guide)
             if self.use_gaze_guide and gaze_guide_embedding is not None:
                 text_input_feat = text_token_vec + gaze_guide_embedding
             else:
                 text_input_feat = text_token_vec
-
-            output_dict["text_loss"] = self.text_head(
-                fusion_feat=text_input_feat, 
-                target_ids=input.get("gaze_point_expression_ids")
-            )
+            
+            # [修改逻辑] 检查是否需要生成文本 (Mode Switching)
+            # 如果 input 中包含 "generate_text": True，则调用 generate
+            if input.get("generate_text", False):
+                # 调用我们在 Decoder 里新写的 generate
+                # 注意：这里需要 tokenizer，可以通过 input 传进来，或者让 Decoder 自己处理默认值
+                # 为了简单，我们这里假设 Decoder 能处理默认值，或者在 main 里把 tokenizer 传进 input
+                generated_ids = self.text_head.generate(
+                    fusion_feat=text_input_feat,
+                    tokenizer=input.get("tokenizer", None) # 从 input 字典获取 tokenizer
+                )
+                output_dict["text_generated"] = generated_ids # 存入新 Key
+                output_dict["text_loss"] = None # 生成模式下通常不算 Loss
+            
+            # 否则计算 Loss (训练/验证指标模式)
+            else:
+                output_dict["text_loss"] = self.text_head(
+                    fusion_feat=text_input_feat, 
+                    target_ids=input.get("gaze_point_expression_ids")
+                )
 
         return output_dict
 

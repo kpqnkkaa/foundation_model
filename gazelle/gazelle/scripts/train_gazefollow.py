@@ -287,7 +287,7 @@ def main():
     eval_dl = torch.utils.data.DataLoader(eval_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, num_workers=args.n_workers)
 
     criterion_logits = nn.BCEWithLogitsLoss(reduction='none') 
-    criterion_seg = nn.BCEWithLogitsLoss(pos_weight=10.0 reduction='none')
+    criterion_seg = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([10.0]), reduction='none')
     criterion_ce = nn.CrossEntropyLoss(ignore_index=-100) 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs, eta_min=1e-7)
@@ -446,11 +446,28 @@ def main():
         for cur_iter, batch in tqdm(enumerate(eval_dl), total=len(eval_dl)):
             imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask, is_face_crop_mode, gaze3d, has_3d = batch
             
-            with torch.no_grad():
-                preds = model({
-                    "images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, 
-                    "observer_expression_ids": observer_expressions.cuda()
-                })
+            input_dict = {
+                "images": imgs.cuda(), 
+                "bboxes": [[bbox] for bbox in bboxes], 
+                "eyes": eyes, 
+                "observer_expression_ids": observer_expressions.cuda(),
+                # 传入 tokenizer 以便 decoder 获取特殊 token id
+                "tokenizer": tokenizer 
+            }
+
+            # [关键] 只有在需要可视化时 (cur_iter == 0)，才开启文本生成
+            # 这样可以节省其他 iter 的推理时间
+            if cur_iter == 0:
+                input_dict["generate_text"] = True
+                
+                # 运行模型 (生成模式)
+                preds = model(input_dict)
+                
+                # 此时 preds['text_generated'] 含有 token IDs
+                # preds['text_loss'] 为 None
+            else:
+                # 运行模型 (Loss 模式，用于计算指标)
+                preds = model(input_dict)
              
             if isinstance(preds['heatmap'], list): heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
             else: heatmap_preds = preds['heatmap'].squeeze(dim=1)
@@ -496,21 +513,24 @@ def main():
                     gt_text = tokenizer.decode(gt_ids, skip_special_tokens=True)
                     
                     pred_text = "N/A"
-                    if 'text_loss' in preds and preds['text_loss'] is not None:
-                        res_text = preds['text_loss']
+                    
+                    # 检查是否有生成的文本 ID
+                    if 'text_generated' in preds and preds['text_generated'] is not None:
+                        gen_out = preds['text_generated'] # [B, Seq_Len]
                         
-                        # 同理处理文本的 batch 索引
-                        if isinstance(res_text, list):
-                            raw_logits = res_text[idx_in_batch] if len(res_text) > idx_in_batch else res_text[0]
-                        else:
-                            raw_logits = res_text[idx_in_batch] if res_text.shape[0] > idx_in_batch else res_text[0]
+                        # 处理 DataParallel 可能导致的维度嵌套
+                        if isinstance(gen_out, list): 
+                            gen_out = gen_out[0]
                         
-                        if torch.is_tensor(raw_logits) and raw_logits.ndim >= 2:
-                            token_ids = torch.argmax(raw_logits, dim=-1)
-                            if idx_in_batch == 0:
-                                logger.info(f"Epoch {epoch} Sample 0 TokenIDs: {token_ids[:10].tolist()}")
-                            pred_text = tokenizer.decode(token_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
-
+                        # 获取当前样本的 token IDs
+                        # 注意：generate 的输出通常包含 input_ids，或者纯粹是新生成的
+                        # 我们取对应 batch 的行
+                        curr_token_ids = gen_out[idx_in_batch]
+                        
+                        # 解码
+                        pred_text = tokenizer.decode(curr_token_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
+                        
+                        logger.info(f"Sample {idx_in_batch} Generated: {pred_text}")
                     cur_dir = None
                     if preds.get('direction') is not None:
                         dir_output = preds['direction']
