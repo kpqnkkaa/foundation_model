@@ -289,52 +289,76 @@ def main():
             heatmap_preds = heatmap_preds.cpu()
             
             # --- 每一批次的第一个样本进行可视化保存 ---
+            # --- 验证集可视化保存逻辑 ---
             if cur_iter == 0:
-                idx_in_batch = 0
-                global_idx = cur_iter * args.batch_size + idx_in_batch
-                img_idx, head_idx = eval_dataset.data_idxs[global_idx]
-                rel_path = eval_dataset.data[img_idx]['path']
-                img_full_path = os.path.join(eval_dataset.path, rel_path)
+                epoch_vis_dir = os.path.join(exp_dir, f"vis_epoch_{epoch}")
+                os.makedirs(epoch_vis_dir, exist_ok=True)
                 
-                cur_hm = heatmap_preds[idx_in_batch]
+                num_to_vis = min(10, len(imgs))
                 
-                cur_seg = None
-                if preds.get('seg') is not None:
-                    if isinstance(preds['seg'], list):
-                        cur_seg = preds['seg'][-1][idx_in_batch]
-                    else:
-                        cur_seg = preds['seg'][idx_in_batch]
+                for idx_in_batch in range(num_to_vis):
+                    global_idx = cur_iter * args.batch_size + idx_in_batch
+                    img_idx, head_idx = eval_dataset.data_idxs[global_idx]
+                    rel_path = eval_dataset.data[img_idx]['path']
+                    img_full_path = os.path.join(eval_dataset.path, rel_path)
+                    
+                    cur_hm = heatmap_preds[idx_in_batch]
+                    
+                    # --- 修正 Seg 获取逻辑 ---
+                    cur_seg = None
+                    if preds.get('seg') is not None:
+                        seg_output = preds['seg']
+                        # 如果是 list (通常包含多个尺度)，取最后一个尺度
+                        if isinstance(seg_output, list):
+                            seg_output = seg_output[-1]
+                        
+                        # 核心修正：检查 batch 维度
+                        if seg_output.ndim >= 3: # [B, H, W] 或 [B, C, H, W]
+                            if seg_output.shape[0] > idx_in_batch:
+                                cur_seg = seg_output[idx_in_batch]
+                            else:
+                                # 如果 B 维度不够，说明 DataParallel 还没拼接或者被 split 了
+                                # 取当前可用的第一个
+                                cur_seg = seg_output[0] 
+                        else:
+                            cur_seg = seg_output
 
-                # --- 文字映射逻辑 ---
-                # 原始 GT 文本
-                gt_ids = gaze_point_expressions[idx_in_batch]
-                gt_text = tokenizer.decode(gt_ids, skip_special_tokens=True)
-                
-                # 预测文本（从推理模式的 logits 反解）
-                pred_text = "N/A"
-                if 'text_logits' in preds and preds['text_logits'] is not None:
-                    # 简单贪婪解码：取最后一个时间步或序列最大概率
-                    logits = preds['text_logits'][idx_in_batch] # [Seq, Vocab]
-                    token_ids = torch.argmax(logits, dim=-1)
-                    pred_text = tokenizer.decode(token_ids, skip_special_tokens=True)
+                    # --- 文本解码逻辑 ---
+                    gt_ids = gaze_point_expressions[idx_in_batch]
+                    gt_text = tokenizer.decode(gt_ids, skip_special_tokens=True)
+                    
+                    pred_text = "N/A"
+                    if 'text_loss' in preds and preds['text_loss'] is not None:
+                        res_text = preds['text_loss']
+                        
+                        # 同理处理文本的 batch 索引
+                        if isinstance(res_text, list):
+                            raw_logits = res_text[idx_in_batch] if len(res_text) > idx_in_batch else res_text[0]
+                        else:
+                            raw_logits = res_text[idx_in_batch] if res_text.shape[0] > idx_in_batch else res_text[0]
+                        
+                        if torch.is_tensor(raw_logits) and raw_logits.ndim >= 2:
+                            token_ids = torch.argmax(raw_logits, dim=-1)
+                            if idx_in_batch == 0:
+                                logger.info(f"Epoch {epoch} Sample 0 TokenIDs: {token_ids[:10].tolist()}")
+                            pred_text = tokenizer.decode(token_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
 
-                vis_preds = {
-                    'heatmap': cur_hm,
-                    'seg': cur_seg,
-                    'text': f"GT: {gt_text}\nPred: {pred_text}"
-                }
+                    vis_preds = {
+                        'heatmap': cur_hm,
+                        'seg': cur_seg,
+                        'text': f"GT: {gt_text}\nPred: {pred_text}"
+                    }
+                    
+                    vis_save_path = os.path.join(epoch_vis_dir, f"sample_{idx_in_batch}.png")
+                    visualize_step(
+                        img_full_path, 
+                        vis_preds, 
+                        bboxes[idx_in_batch],  
+                        [gazex[idx_in_batch][0], gazey[idx_in_batch][0]], 
+                        vis_save_path
+                    )
                 
-                vis_save_path = os.path.join(exp_dir, f"vis_epoch_{epoch}.png")
-                
-                visualize_step(
-                    img_full_path, 
-                    vis_preds, 
-                    bboxes[idx_in_batch],  # 确保这里是 [x1, y1, x2, y2]
-                    [gazex[idx_in_batch][0], gazey[idx_in_batch][0]], 
-                    vis_save_path
-                )
-                logger.info(f"Saved visualization to: {vis_save_path}")
-
+                logger.info(f"Saved {num_to_vis} visualizations to: {epoch_vis_dir}")
             # 指标计算
             for i in range(heatmap_preds.shape[0]):
                 auc = gazefollow_auc(heatmap_preds[i], gazex[i], gazey[i], heights[i], widths[i])
