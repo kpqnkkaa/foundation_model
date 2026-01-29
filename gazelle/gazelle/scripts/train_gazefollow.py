@@ -471,7 +471,9 @@ def main():
             heatmap_preds = heatmap_preds.cpu()
             
             # --- 每一批次的第一个样本进行可视化保存 ---
-            # --- 验证集可视化保存逻辑 ---
+            # ==========================================
+            # 可视化部分 (仅第一批次)
+            # ==========================================
             if cur_iter == 0:
                 epoch_vis_dir = os.path.join(exp_dir, f"vis_epoch_{epoch}")
                 os.makedirs(epoch_vis_dir, exist_ok=True)
@@ -484,85 +486,118 @@ def main():
                     rel_path = eval_dataset.data[img_idx]['path']
                     img_full_path = os.path.join(eval_dataset.path, rel_path)
                     
-                    cur_hm = heatmap_preds[idx_in_batch]
+                    # --- 1. Prepare GT Data ---
+                    cur_bbox = bboxes[idx_in_batch] # Normalized [x1, y1, x2, y2]
                     
-                    # --- 修正 Seg 获取逻辑 ---
-                    cur_seg = None
-                    if preds.get('seg') is not None:
-                        seg_output = preds['seg']
-                        # 如果是 list (通常包含多个尺度)，取最后一个尺度
-                        if isinstance(seg_output, list):
-                            seg_output = seg_output[-1]
-                        
-                        # 核心修正：检查 batch 维度
-                        if seg_output.ndim >= 3: # [B, H, W] 或 [B, C, H, W]
-                            if seg_output.shape[0] > idx_in_batch:
-                                cur_seg = seg_output[idx_in_batch]
-                            else:
-                                # 如果 B 维度不够，说明 DataParallel 还没拼接或者被 split 了
-                                # 取当前可用的第一个
-                                cur_seg = seg_output[0] 
-                        else:
-                            cur_seg = seg_output
-
-                    # --- 文本解码逻辑 ---
+                    # GT Point (Normalized [x, y])
+                    cur_gt_point = [gazex[idx_in_batch][0], gazey[idx_in_batch][0]]
+                    
+                    # GT Mask (keep as Tensor or None, visualizer handles it)
+                    cur_gt_mask = None
+                    if seg_mask is not None:
+                        cur_gt_mask = seg_mask[idx_in_batch]
+                    
+                    # GT Text
                     gt_ids = gaze_point_expressions[idx_in_batch]
                     gt_text = tokenizer.decode(gt_ids, skip_special_tokens=True)
                     
-                    pred_text = "N/A"
-                    
-                    # 检查是否有生成的文本 ID
-                    if 'text_generated' in preds and preds['text_generated'] is not None:
-                        gen_out = preds['text_generated'] # [B, Seq_Len]
-                        
-                        # 处理 DataParallel 可能导致的维度嵌套
-                        if isinstance(gen_out, list): 
-                            gen_out = gen_out[0]
-                        
-                        # 获取当前样本的 token IDs
-                        # 注意：generate 的输出通常包含 input_ids，或者纯粹是新生成的
-                        # 我们取对应 batch 的行
-                        curr_token_ids = gen_out[idx_in_batch]
-                        
-                        # 解码
-                        pred_text = tokenizer.decode(curr_token_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
-                        
-                        logger.info(f"Sample {idx_in_batch} Generated: {pred_text}")
-                    cur_dir = None
-                    if preds.get('direction') is not None:
-                        dir_output = preds['direction']
-                        # 处理 batch 和 list 情况
-                        if isinstance(dir_output, list):
-                            # 如果是多尺度列表，取最后一层，然后取 batch index
-                            last_scale = dir_output[-1] if isinstance(dir_output[-1], torch.Tensor) else dir_output[0]
-                            cur_dir = last_scale[idx_in_batch] if last_scale.shape[0] > idx_in_batch else last_scale[0]
-                        else:
-                            cur_dir = dir_output[idx_in_batch] if dir_output.shape[0] > idx_in_batch else dir_output[0]
+                    # GT Direction
+                    gt_dir_idx = -100
+                    if gaze_directions is not None:
+                        gt_dir_idx = gaze_directions[idx_in_batch] # Tensor or int
 
-                    vis_preds = {
-                        'heatmap': cur_hm,
-                        'seg': cur_seg,
-                        'text': f"GT: {gt_text}\nPred: {pred_text}",
-                        'direction': cur_dir
-                    }
-                    
+                    # --- 2. Prepare Pred Data ---
+                    cur_hm = heatmap_preds[idx_in_batch].numpy()
+                    if cur_hm.ndim > 2: cur_hm = cur_hm[0]
+                    hm_idx = np.unravel_index(np.argmax(cur_hm), cur_hm.shape)
+                    pred_y_norm = (hm_idx[0] + 0.5) / cur_hm.shape[0]
+                    pred_x_norm = (hm_idx[1] + 0.5) / cur_hm.shape[1]
+                    cur_pred_point = [pred_x_norm, pred_y_norm]
+
+                    # [B] Pred Mask (修正 List 索引逻辑)
+                    cur_pred_mask = None
+                    if preds.get('seg') is not None:
+                        seg_out = preds['seg'] # 这是一个 List: [Tensor(1, H, W), Tensor(1, H, W), ...]
+                        
+                        # 1. 提取当前图片的 Tensor
+                        if isinstance(seg_out, list):
+                            # 直接取对应索引，而不是取最后一个 [-1]
+                            curr_img_seg = seg_out[idx_in_batch] 
+                        else:
+                            curr_img_seg = seg_out[idx_in_batch]
+                            
+                        # 2. 处理 Tensor 内部 (通常 GazeFollow 每张图只有 1 个目标)
+                        # curr_img_seg shape: [Num_People, H, W] -> 通常是 [1, 64, 64]
+                        if curr_img_seg.ndim >= 3:
+                            cur_pred_mask = torch.sigmoid(curr_img_seg[0]) # 取第一个人
+                        else:
+                            cur_pred_mask = torch.sigmoid(curr_img_seg)
+
+                    # [C] Pred Text (修正 List 索引逻辑)
+                    pred_text = "N/A"
+                    if 'text_generated' in preds and preds['text_generated'] is not None:
+                        gen_out = preds['text_generated'] # List: [Tensor(1, Seq), ...]
+                        
+                        if isinstance(gen_out, list):
+                            curr_token_ids = gen_out[idx_in_batch]
+                        else:
+                            curr_token_ids = gen_out[idx_in_batch]
+                        
+                        # 如果 tensor 维度是 [Num_People, Seq]，取第一个人
+                        if curr_token_ids.ndim > 1: curr_token_ids = curr_token_ids[0]
+                        
+                        pred_text = tokenizer.decode(curr_token_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
+                        logger.info(f"Sample {idx_in_batch} Generated: {pred_text}")
+                        
+                    elif 'text_loss' in preds:
+                         res_text = preds['text_loss'] # List: [Tensor(1, Vocab), ...]
+                         if isinstance(res_text, list): 
+                             raw = res_text[idx_in_batch]
+                         else: 
+                             raw = res_text[idx_in_batch]
+                             
+                         if torch.is_tensor(raw) and raw.ndim > 0:
+                              # 取第一个人的 logits
+                              if raw.ndim > 1: raw = raw[0]
+                              pred_text = f"[Argmax] {tokenizer.decode(torch.argmax(raw, -1), skip_special_tokens=True)}"
+
+                    # [D] Pred Direction (修正 List 索引逻辑 - 解决 IndexError)
+                    cur_pred_dir_idx = -100
+                    if preds.get('direction') is not None:
+                        d_out = preds['direction'] # List: [Tensor(1, 8), Tensor(1, 8)...]
+                        
+                        # 1. 提取当前图片的 Tensor
+                        if isinstance(d_out, list):
+                            d_val = d_out[idx_in_batch] # Tensor shape [Num_People, 8]
+                        else:
+                            d_val = d_out[idx_in_batch]
+                        
+                        # 2. 取 argmax
+                        if d_val.ndim > 1: 
+                            # d_val[0] 取第一个人
+                            cur_pred_dir_idx = torch.argmax(d_val[0]).item()
+                        else:
+                            cur_pred_dir_idx = torch.argmax(d_val).item()
+
+                    # --- 3. Call New Visualizer ---
                     vis_save_path = os.path.join(epoch_vis_dir, f"sample_{idx_in_batch}.png")
                     
-                    cur_gt_seg = seg_mask[idx_in_batch] if seg_mask is not None else None
-                    # 如果是 Tensor，确保还在 CPU 上
-                    if cur_gt_seg is not None and torch.is_tensor(cur_gt_seg):
-                        cur_gt_seg = cur_gt_seg.cpu().numpy()
-                    
-                    visualize_step(
-                        img_full_path, 
-                        vis_preds, 
-                        bboxes[idx_in_batch],  
-                        [gazex[idx_in_batch][0], gazey[idx_in_batch][0]], 
-                        vis_save_path,
-                        cur_gt_seg
+                    visualize_comparison(
+                        image_path=img_full_path,
+                        bbox=cur_bbox,
+                        gt_point=cur_gt_point,
+                        gt_mask=cur_gt_mask,
+                        gt_text=gt_text,
+                        gt_dir_idx=gt_dir_idx,
+                        pred_point=cur_pred_point,
+                        pred_mask=cur_pred_mask,
+                        pred_text=pred_text,
+                        pred_dir_idx=cur_pred_dir_idx,
+                        save_path=vis_save_path
                     )
                 
-                logger.info(f"Saved {num_to_vis} visualizations to: {epoch_vis_dir}")
+                logger.info(f"Saved {num_to_vis} comparison visualizations to: {epoch_vis_dir}")
+
             # 指标计算
             for i in range(heatmap_preds.shape[0]):
                 auc = gazefollow_auc(heatmap_preds[i], gazex[i], gazey[i], heights[i], widths[i])
