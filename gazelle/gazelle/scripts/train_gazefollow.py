@@ -192,18 +192,13 @@ def main():
     tokenizer.pad_token = tokenizer.eos_token
 
     # 初始化模型
-    if args.is_mix_gaze_estimation:
-        backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=False, is_multi_input=True)
-        transform = backbone.get_transform((448, 448))
-        model = GazeLLE(backbone, inout=False, is_sam_prompt=True, is_mix_gaze_estimation=True, is_multi_output=False)
-    else:
-        model, transform = get_gazelle_model(args.model)
+    model, transform = get_gazelle_model(args.model)
     
     model.cuda()
     if torch.cuda.device_count() > 1: model = DataParallelWrapper(model)
 
     # 数据加载
-    gazefollow_train = GazeDataset('gazefollow', args.data_path, 'train', transform, is_partial_input=args.is_partial_input)
+    gazefollow_train = GazeDataset('gazefollow', args.data_path, 'train', transform, is_mix_gaze_estimation=args.is_mix_gaze_estimation, is_partial_input=args.is_partial_input)
     train_dl_gf = torch.utils.data.DataLoader(gazefollow_train, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, num_workers=args.n_workers)
     
     if args.is_mix_gaze_estimation:
@@ -297,7 +292,6 @@ def main():
                     loss += loss_seg_est * 0.1 * 0.1 # 更小的辅助权重
 
             # --- C. Text Loss ---
-            # --- C. Text Loss (Weighted) ---
             if preds['text_loss'] is not None:
                 # preds['text_loss'] 现在是 [B] 维度的 Tensor
                 
