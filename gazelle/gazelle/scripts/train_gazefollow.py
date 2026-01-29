@@ -144,11 +144,9 @@ def visualize_comparison(image_path, bbox,
                              linewidth=2, edgecolor='blue', facecolor='none')
     ax.add_patch(rect)
     
-    # 2. Pred Point (Blue Cross)
     if pred_point is not None:
-        # pred_point 传入的是归一化坐标 [x_norm, y_norm]
-        ax.scatter(pred_point[0]*w, pred_point[1]*h, c='blue', s=150, marker='x', linewidth=3)
-        
+        ax.scatter(pred_point[0]*w, pred_point[1]*h, c='blue', s=100, marker='o', edgecolors='white', linewidth=2)
+
     # 3. Pred Seg Mask (Blue Overlay)
     if pred_mask is not None:
         if torch.is_tensor(pred_mask): p_m = pred_mask.detach().cpu().numpy()
