@@ -348,3 +348,40 @@
 2026-01-29 14:56:56,336 - Iter 1530/1891 heatmap_loss: 0.0475, text_loss: 1.4182, direction_loss: 1.0730, seg_loss: 0.1839, total_loss: 0.1015
 2026-01-29 14:57:09,969 - Iter 1540/1891 heatmap_loss: 0.0433, text_loss: 1.4258, direction_loss: 1.1429, seg_loss: 0.1680, total_loss: 0.0973
 2026-01-29 14:57:23,739 - Iter 1550/1891 heatmap_loss: 0.0490, text_loss: 1.4647, direction_loss: 1.0829, seg_loss: 0.1607, total_loss: 0.1014
+2026-01-29 14:57:37,706 - Iter 1560/1891 heatmap_loss: 0.0460, text_loss: 1.3864, direction_loss: 1.0414, seg_loss: 0.1019, total_loss: 0.0909
+2026-01-29 14:57:51,807 - Iter 1570/1891 heatmap_loss: 0.0497, text_loss: 1.3151, direction_loss: 0.9009, seg_loss: 0.2159, total_loss: 0.1025
+2026-01-29 14:58:05,652 - Iter 1580/1891 heatmap_loss: 0.0463, text_loss: 1.4465, direction_loss: 1.0452, seg_loss: 0.1179, total_loss: 0.0935
+2026-01-29 14:58:19,483 - Iter 1590/1891 heatmap_loss: 0.0469, text_loss: 1.3207, direction_loss: 1.0682, seg_loss: 0.1952, total_loss: 0.1010
+2026-01-29 14:58:34,030 - Iter 1600/1891 heatmap_loss: 0.0473, text_loss: 1.3259, direction_loss: 0.8587, seg_loss: 0.1017, total_loss: 0.0879
+2026-01-29 14:58:48,027 - Iter 1610/1891 heatmap_loss: 0.0439, text_loss: 1.2060, direction_loss: 1.0264, seg_loss: 0.1338, total_loss: 0.0899
+2026-01-29 14:59:02,040 - Iter 1620/1891 heatmap_loss: 0.0476, text_loss: 1.4190, direction_loss: 1.1376, seg_loss: 0.1094, total_loss: 0.0955
+2026-01-29 14:59:16,104 - Iter 1630/1891 heatmap_loss: 0.0453, text_loss: 1.3946, direction_loss: 1.0103, seg_loss: 0.2117, total_loss: 0.1006
+2026-01-29 14:59:30,028 - Iter 1640/1891 heatmap_loss: 0.0471, text_loss: 1.4463, direction_loss: 1.1562, seg_loss: 0.1550, total_loss: 0.1002
+2026-01-29 14:59:44,288 - Iter 1650/1891 heatmap_loss: 0.0471, text_loss: 1.4656, direction_loss: 0.9827, seg_loss: 0.1330, total_loss: 0.0947
+2026-01-29 14:59:58,514 - Iter 1660/1891 heatmap_loss: 0.0450, text_loss: 1.2768, direction_loss: 0.9347, seg_loss: 0.1284, total_loss: 0.0893
+2026-01-29 15:00:12,585 - Iter 1670/1891 heatmap_loss: 0.0494, text_loss: 1.3309, direction_loss: 1.1798, seg_loss: 0.1578, total_loss: 0.1021
+2026-01-29 15:00:26,544 - Iter 1680/1891 heatmap_loss: 0.0498, text_loss: 1.3651, direction_loss: 1.1730, seg_loss: 0.1432, total_loss: 0.1012
+2026-01-29 15:00:41,057 - Iter 1690/1891 heatmap_loss: 0.0470, text_loss: 1.3317, direction_loss: 1.0357, seg_loss: 0.1803, total_loss: 0.0991
+2026-01-29 15:00:55,613 - Iter 1700/1891 heatmap_loss: 0.0445, text_loss: 1.5209, direction_loss: 1.0858, seg_loss: 0.1175, total_loss: 0.0932
+2026-01-29 15:01:09,861 - Iter 1710/1891 heatmap_loss: 0.0448, text_loss: 1.4485, direction_loss: 1.1368, seg_loss: 0.1882, total_loss: 0.1008
+2026-01-29 15:01:23,944 - Iter 1720/1891 heatmap_loss: 0.0457, text_loss: 1.5051, direction_loss: 1.1384, seg_loss: 0.1291, total_loss: 0.0964
+2026-01-29 15:01:38,143 - Iter 1730/1891 heatmap_loss: 0.0483, text_loss: 1.2565, direction_loss: 1.2347, seg_loss: 0.1333, total_loss: 0.0989
+2026-01-29 15:01:52,472 - Iter 1740/1891 heatmap_loss: 0.0427, text_loss: 1.3074, direction_loss: 1.1714, seg_loss: 0.0935, total_loss: 0.0886
+2026-01-29 15:02:06,429 - Iter 1750/1891 heatmap_loss: 0.0469, text_loss: 1.2844, direction_loss: 1.2190, seg_loss: 0.1475, total_loss: 0.0989
+2026-01-29 15:02:20,840 - Iter 1760/1891 heatmap_loss: 0.0436, text_loss: 1.2249, direction_loss: 1.2073, seg_loss: 0.1706, total_loss: 0.0970
+2026-01-29 15:02:34,971 - Iter 1770/1891 heatmap_loss: 0.0415, text_loss: 1.2424, direction_loss: 0.9138, seg_loss: 0.1360, total_loss: 0.0858
+2026-01-29 15:02:49,596 - Iter 1780/1891 heatmap_loss: 0.0476, text_loss: 1.3522, direction_loss: 1.0859, seg_loss: 0.1421, total_loss: 0.0970
+2026-01-29 15:03:03,804 - Iter 1790/1891 heatmap_loss: 0.0451, text_loss: 1.4100, direction_loss: 1.1249, seg_loss: 0.2214, total_loss: 0.1038
+2026-01-29 15:03:18,162 - Iter 1800/1891 heatmap_loss: 0.0467, text_loss: 1.2747, direction_loss: 1.0955, seg_loss: 0.1500, total_loss: 0.0964
+2026-01-29 15:03:32,315 - Iter 1810/1891 heatmap_loss: 0.0511, text_loss: 1.4389, direction_loss: 1.2172, seg_loss: 0.1458, total_loss: 0.1044
+2026-01-29 15:03:46,386 - Iter 1820/1891 heatmap_loss: 0.0479, text_loss: 1.3590, direction_loss: 1.1298, seg_loss: 0.1683, total_loss: 0.1010
+2026-01-29 15:04:00,612 - Iter 1830/1891 heatmap_loss: 0.0474, text_loss: 1.3775, direction_loss: 1.1888, seg_loss: 0.1588, total_loss: 0.1008
+2026-01-29 15:04:14,863 - Iter 1840/1891 heatmap_loss: 0.0463, text_loss: 1.2660, direction_loss: 1.2418, seg_loss: 0.1318, total_loss: 0.0970
+2026-01-29 15:04:29,219 - Iter 1850/1891 heatmap_loss: 0.0448, text_loss: 1.4423, direction_loss: 1.1755, seg_loss: 0.1593, total_loss: 0.0987
+2026-01-29 15:04:43,463 - Iter 1860/1891 heatmap_loss: 0.0464, text_loss: 1.3821, direction_loss: 1.1920, seg_loss: 0.1126, total_loss: 0.0954
+2026-01-29 15:04:57,892 - Iter 1870/1891 heatmap_loss: 0.0471, text_loss: 1.3754, direction_loss: 1.0466, seg_loss: 0.0860, total_loss: 0.0904
+2026-01-29 15:05:11,931 - Iter 1880/1891 heatmap_loss: 0.0509, text_loss: 1.3735, direction_loss: 1.0845, seg_loss: 0.1661, total_loss: 0.1029
+2026-01-29 15:05:26,055 - Iter 1890/1891 heatmap_loss: 0.0457, text_loss: 1.4326, direction_loss: 1.2793, seg_loss: 0.1323, total_loss: 0.0989
+2026-01-29 15:05:27,767 - [Epoch 1 Evaluation]
+2026-01-29 15:05:29,729 - Epoch 1 Sample 0 TokenIDs: [1169]
+2026-01-29 15:05:35,085 - Saved 10 visualizations to: ./experiments/dinov2_vitb_lora_multi_output/2026-01-29_13-30-29/vis_epoch_1

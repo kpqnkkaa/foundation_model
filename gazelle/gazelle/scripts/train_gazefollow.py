@@ -56,7 +56,7 @@ args = parser.parse_args()
 # ==========================================
 # 可视化核心函数
 # ==========================================
-def visualize_step(image_path, preds, bbox, gt_point, save_path):
+def visualize_step(image_path, preds, bbox, gt_point, save_path, gt_mask):
     img = Image.open(image_path).convert('RGB')
     w, h = img.size
     fig, ax = plt.subplots(1, figsize=(10, 10))
@@ -80,15 +80,45 @@ def visualize_step(image_path, preds, bbox, gt_point, save_path):
         pred_y, pred_x = idx[0] * (h / hm.shape[0]), idx[1] * (w / hm.shape[1])
         ax.scatter(pred_x, pred_y, c='lime', s=150, marker='x', linewidths=3, label='Pred Point')
 
-    # 4. Seg Mask (绿色透明层)
+    # A. 绘制 GT Mask (蓝色, 透明度 0.4)
+    if gt_mask is not None:
+        # gt_mask 可能是 Tensor 或 numpy，确保转为 numpy [H, W]
+        if torch.is_tensor(gt_mask):
+            g_m = gt_mask.detach().cpu().squeeze().numpy()
+        else:
+            g_m = gt_mask
+            
+        if g_m.ndim == 3: g_m = g_m[0] # 防止多通道
+        
+        # Resize 到原图大小
+        g_m_resized = cv2.resize(g_m, (w, h), interpolation=cv2.INTER_NEAREST)
+        
+        # 制作蓝色遮罩
+        gt_overlay = np.zeros((h, w, 4))
+        gt_overlay[..., 2] = 1.0  # Blue 通道设为 1
+        # 使用 mask 作为 Alpha 通道，只显示 mask 区域
+        # 稍微容错一下，大于 0.5 算前景
+        gt_overlay[..., 3] = (g_m_resized > 0.5).astype(np.float32) * 0.3 # Alpha 0.3
+        
+        ax.imshow(gt_overlay, interpolation='nearest')
+
+    # B. 绘制 Pred Mask (绿色, 增强显示)
     if 'seg' in preds and preds['seg'] is not None:
         seg = torch.sigmoid(preds['seg']).detach().cpu().squeeze().numpy()
         if seg.ndim == 3: seg = seg[0]
+        
         seg_resized = cv2.resize(seg, (w, h))
-        mask_overlay = np.zeros((h, w, 4))
-        mask_overlay[..., 1] = 1.0  # Green
-        mask_overlay[..., 3] = seg_resized * 0.6
-        ax.imshow(mask_overlay)
+        
+        pred_overlay = np.zeros((h, w, 4))
+        pred_overlay[..., 1] = 1.0  # Green 通道
+        
+        # [修改点] 为了让 Pred 更明显:
+        # 1. 对概率进行阈值处理，过滤掉背景噪音 (比如 > 0.1 就显示)
+        # 2. 增加 Alpha 透明度到 0.6
+        valid_mask = (seg_resized > 0.1).astype(np.float32) 
+        pred_overlay[..., 3] = valid_mask * 0.6 # Alpha 0.6
+        
+        ax.imshow(pred_overlay, interpolation='nearest')
 
     # 5. [修改] Direction Arrow (黄色箭头)
     if 'direction' in preds and preds['direction'] is not None:
@@ -257,6 +287,7 @@ def main():
     eval_dl = torch.utils.data.DataLoader(eval_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, num_workers=args.n_workers)
 
     criterion_logits = nn.BCEWithLogitsLoss(reduction='none') 
+    criterion_seg = nn.BCEWithLogitsLoss(pos_weight=10.0 reduction='none')
     criterion_ce = nn.CrossEntropyLoss(ignore_index=-100) 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs, eta_min=1e-7)
@@ -325,16 +356,16 @@ def main():
                 if isinstance(preds['seg'], list): seg_preds = torch.stack(preds['seg']).squeeze(dim=1)
                 else: seg_preds = preds['seg'].squeeze(dim=1)
                 
-                seg_loss_per_sample = criterion_logits(seg_preds, seg_mask.cuda()).mean(dim=(1,2))
+                seg_loss_per_sample = criterion_seg(seg_preds, seg_mask.cuda()).mean(dim=(1,2))
                 
                 if num_gf > 0:
                     loss_seg_gf = seg_loss_per_sample[is_gf].mean()
-                    loss += loss_seg_gf * 0.1 # 原有权重
+                    loss += loss_seg_gf * 0.5 # 原有权重
                     log_seg_loss = loss_seg_gf.item()
                 
                 if num_est > 0:
                     loss_seg_est = seg_loss_per_sample[is_est].mean()
-                    loss += loss_seg_est * 0.1 * 0.1 # 更小的辅助权重
+                    loss += loss_seg_est * 0.5 * 0.1 # 更小的辅助权重
 
             # --- C. Text Loss ---
             if preds['text_loss'] is not None:
@@ -499,12 +530,19 @@ def main():
                     }
                     
                     vis_save_path = os.path.join(epoch_vis_dir, f"sample_{idx_in_batch}.png")
+                    
+                    cur_gt_seg = seg_mask[idx_in_batch] if seg_mask is not None else None
+                    # 如果是 Tensor，确保还在 CPU 上
+                    if cur_gt_seg is not None and torch.is_tensor(cur_gt_seg):
+                        cur_gt_seg = cur_gt_seg.cpu().numpy()
+                    
                     visualize_step(
                         img_full_path, 
                         vis_preds, 
                         bboxes[idx_in_batch],  
                         [gazex[idx_in_batch][0], gazey[idx_in_batch][0]], 
-                        vis_save_path
+                        vis_save_path,
+                        cur_gt_seg
                     )
                 
                 logger.info(f"Saved {num_to_vis} visualizations to: {epoch_vis_dir}")

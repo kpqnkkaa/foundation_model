@@ -112,15 +112,21 @@ class GazeLLE(nn.Module):
         # 无论是不是 SAM，只要有对应任务，就初始化对应的 Token
         if self.inout:
             self.inout_token = nn.Embedding(1, self.dim)
+
+        self.heatmap_proj = nn.Sequential(
+            nn.Conv2d(dim, dim, kernel_size=3, padding=1),
+            nn.BatchNorm2d(dim),
+            nn.ReLU()
+        )
         
         if self.is_multi_output:
             # 顺序: [Seg, Direction, Text]
             self.multi_output_tokens = nn.Embedding(3, self.dim)
             
-            # [新增] Dynamic Seg Head 组件 (MLP + Proj)
-            # 用于根据 Seg Token 生成动态卷积核
-            self.seg_token_proj = nn.Sequential(nn.Linear(dim, dim), nn.ReLU(), nn.Linear(dim, dim))
-            self.seg_feat_proj = nn.Sequential(nn.Conv2d(dim, dim, kernel_size=1), nn.ReLU())
+            # # [新增] Dynamic Seg Head 组件 (MLP + Proj)
+            # # 用于根据 Seg Token 生成动态卷积核
+            # self.seg_token_proj = nn.Sequential(nn.Linear(dim, dim), nn.ReLU(), nn.Linear(dim, dim))
+            # self.seg_feat_proj = nn.Sequential(nn.Conv2d(dim, dim, kernel_size=1), nn.ReLU())
 
         # Legacy Support: 如果不是 SAM Backbone，还需要旧的 Head Token
         if not is_sam_prompt:
@@ -168,8 +174,15 @@ class GazeLLE(nn.Module):
 
         # C. Multi-Output Heads
         if self.is_multi_output:
-            # Segmentation Head: 已改为 Dynamic Head，不再需要静态 Deconv 定义
-            
+            # 使用 Upsample + Conv 结构，通常比 ConvTranspose2d 对边缘分割更好
+            self.seg_head = nn.Sequential(
+                nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
+                nn.Conv2d(dim, dim // 2, kernel_size=3, padding=1),
+                nn.BatchNorm2d(dim // 2),
+                nn.ReLU(),
+                nn.Conv2d(dim // 2, 1, kernel_size=1) # Logits 输出
+            )
+
             # Direction Head (8分类)
             self.direction_head = nn.Sequential(
                 nn.Linear(self.dim, 128), nn.ReLU(), nn.Dropout(0.1),
@@ -347,28 +360,29 @@ class GazeLLE(nn.Module):
         # ============================================================
         
         # --- Gaze Heatmap (Static Head) ---
-        # 使用引导后的特征 x_img_final
-        heatmap = self.heatmap_head(x_img_final)
-        heatmap = torchvision.transforms.functional.resize(heatmap, self.out_size)
+        # 走 Heatmap 专用投影
+        feat_heatmap = self.heatmap_proj(x_img_final)
+        heatmap = self.heatmap_head(feat_heatmap)
+        
+        # 强制 Resize 到目标尺寸 (以防上采样倍率不对)
+        heatmap = F.interpolate(heatmap, size=self.out_size, mode='bilinear', align_corners=False)
         heatmap = heatmap.squeeze(1)
         output_dict["heatmap"] = utils.split_tensors(heatmap, num_ppl_per_img)
         
-        # --- Multi-Output Targets ---
+        # --- 2. Segmentation ---
         if self.is_multi_output:
-            # 1. Seg Heatmap (Dynamic Head)
-            # 同样使用引导后的特征
-            mask_features = self.seg_feat_proj(x_img_final)
-            seg_kernel = self.seg_token_proj(seg_token_vec)
+            # 走 Seg 专用投影
+            feat_seg = self.seg_proj(x_img_final) 
             
-            # Dynamic Convolution (Dot Product)
-            # 只有当图像特征匹配(引导后)且Seg Token指令匹配时才激活
-            seg_logits = torch.einsum("bchw, bc -> bhw", mask_features, seg_kernel)
+            # 即使是 Dynamic Kernel 方案，也建议用独立特征
+            # 如果你之前用的是 Dynamic Head (Einsum)，这里就把 feat_seg 喂进去
+            # 如果用的是上面定义的 Static Head:
+            seg_map = self.seg_head(feat_seg)
             
-            seg_map = seg_logits.unsqueeze(1)
             seg_map = F.interpolate(seg_map, size=self.out_size, mode='bilinear', align_corners=False)
             seg_map = seg_map.squeeze(1)
             output_dict["seg"] = utils.split_tensors(seg_map, num_ppl_per_img)
-
+            
             # 2. Text Output
             # 将 Gaze Embedding 融合进 Text Token，作为 Condition (如果启用了引导)
             if self.use_gaze_guide and gaze_guide_embedding is not None:
