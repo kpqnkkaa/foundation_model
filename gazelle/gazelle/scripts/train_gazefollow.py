@@ -287,7 +287,7 @@ def main():
     eval_dl = torch.utils.data.DataLoader(eval_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, num_workers=args.n_workers)
 
     criterion_logits = nn.BCEWithLogitsLoss(reduction='none') 
-    criterion_seg = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([10.0]), reduction='none')
+    criterion_seg = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([10.0]).cuda(), reduction='none')
     criterion_ce = nn.CrossEntropyLoss(ignore_index=-100) 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs, eta_min=1e-7)
@@ -461,13 +461,16 @@ def main():
                 input_dict["generate_text"] = True
                 
                 # 运行模型 (生成模式)
-                preds = model(input_dict)
+                torch.no_grad()
+                with torch.no_grad():
+                    preds = model(input_dict)
                 
                 # 此时 preds['text_generated'] 含有 token IDs
                 # preds['text_loss'] 为 None
             else:
                 # 运行模型 (Loss 模式，用于计算指标)
-                preds = model(input_dict)
+                with torch.no_grad():
+                    preds = model(input_dict)
              
             if isinstance(preds['heatmap'], list): heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
             else: heatmap_preds = preds['heatmap'].squeeze(dim=1)

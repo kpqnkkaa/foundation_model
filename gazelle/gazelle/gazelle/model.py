@@ -123,6 +123,11 @@ class GazeLLE(nn.Module):
             # 顺序: [Seg, Direction, Text]
             self.multi_output_tokens = nn.Embedding(3, self.dim)
             
+            self.seg_proj = nn.Sequential(
+                nn.Conv2d(dim, dim, kernel_size=3, padding=1),
+                nn.BatchNorm2d(dim),
+                nn.ReLU()
+            )
             # # [新增] Dynamic Seg Head 组件 (MLP + Proj)
             # # 用于根据 Seg Token 生成动态卷积核
             # self.seg_token_proj = nn.Sequential(nn.Linear(dim, dim), nn.ReLU(), nn.Linear(dim, dim))
