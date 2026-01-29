@@ -114,7 +114,7 @@ class SAMInferenceDataset(Dataset):
         points_torch = torch.as_tensor(points_trans).float()
 
         # 【修改 1】使用 "head_bbox_norm" 获取 BBox
-        bbox_norm = torch.tensor([item_data['head_bbox_norm']['x_min'], gaze_data['head_bbox_norm']['y_min'], gaze_data['head_bbox_norm']['x_max'], gaze_data['head_bbox_norm']['y_max']], dtype=torch.float32)
+        bbox_norm = torch.tensor([item_data['head_bbox_norm']['x_min'], item_data['head_bbox_norm']['y_min'], item_data['head_bbox_norm']['x_max'], item_data['head_bbox_norm']['y_max']], dtype=torch.float32)
         
         # 传递原始 Gaze 坐标用于可视化 (Normalized [x, y])
         gaze_center_norm = torch.tensor([g_norm['x'], g_norm['y']], dtype=torch.float32)
