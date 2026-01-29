@@ -18,3 +18,7 @@
 2026-01-29 04:20:50,770 - Epoch 4 Sample 0 TokenIDs: [1169]
 2026-01-29 04:20:55,888 - Saved 10 visualizations to: ./experiments/dinov2_vitb_lora_multi_output/2026-01-29_00-55-37/vis_epoch_4
 2026-01-29 04:25:16,905 - Eval Epoch 4: Min L2=0.0972, AUC=0.9302
+2026-01-29 05:02:33,925 - [Epoch 5 Evaluation]
+2026-01-29 05:02:36,389 - Epoch 5 Sample 0 TokenIDs: [1169]
+2026-01-29 05:02:41,441 - Saved 10 visualizations to: ./experiments/dinov2_vitb_lora_multi_output/2026-01-29_00-55-37/vis_epoch_5
+2026-01-29 05:07:19,151 - Eval Epoch 5: Min L2=0.0945, AUC=0.9342
