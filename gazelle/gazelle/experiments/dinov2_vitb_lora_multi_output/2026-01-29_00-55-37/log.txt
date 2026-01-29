@@ -1,0 +1,3 @@
+2026-01-29 01:33:45,162 - [Epoch 0 Evaluation]
+2026-01-29 01:33:47,309 - Epoch 0 Sample 0 TokenIDs: [1169]
+2026-01-29 01:33:52,749 - Saved 10 visualizations to: ./experiments/dinov2_vitb_lora_multi_output/2026-01-29_00-55-37/vis_epoch_0
