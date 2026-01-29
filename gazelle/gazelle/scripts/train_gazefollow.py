@@ -365,7 +365,7 @@ def main():
                 avg_l2, min_l2 = gazefollow_l2(heatmap_preds[i], gazex[i], gazey[i])
                 aucs.append(auc); avg_l2s.append(avg_l2); min_l2s.append(min_l2)
                 
-        logger.info(f"Eval Epoch {epoch}: Min L2={np.mean(min_l2s):.4f}, AUC={np.mean(aucs):.4f}")
+        logger.info(f"Eval Epoch {epoch}: AUC={np.mean(aucs):.4f}, Min L2={np.mean(min_l2s):.4f}, Avg L2={np.mean(avg_l2s):.4f}")
         scheduler.step()
 
 if __name__ == '__main__':
