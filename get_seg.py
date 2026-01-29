@@ -24,6 +24,10 @@ SAM_CHECKPOINT = os.path.join(CHECKPOINT_DIR, MODEL_FILENAME)
 JSON_ROOT_DIR = '/mnt/nvme1n1/lululemon/xjj/result/information_fusion'
 MASK_ROOT_DIR = '/mnt/nvme1n1/lululemon/xjj/datasets/Gaze_Masks'
 
+# 【新增】可视化检查结果保存路径
+CHECK_MASK_DIR = '/mnt/nvme1n1/lululemon/xjj/datasets/check_Gaze_masks'
+VIS_INTERVAL = 50  # 每隔多少张图片保存一张可视化结果用于检查
+
 TARGET_GPUS = [2, 3] 
 
 # 【核心参数】
@@ -64,7 +68,7 @@ def get_mask_save_path(mask_root_dir, img_path, gaze_idx):
     return save_dir, save_path
 
 # =========================================================
-# 核心修改：Dataset 读取 Eye Point 作为负样本
+# 核心修改：Dataset 读取 Eye Point 作为负样本 + 【新增 bbox 传递】
 # =========================================================
 class SAMInferenceDataset(Dataset):
     def __init__(self, items, mask_root_dir):
@@ -109,13 +113,22 @@ class SAMInferenceDataset(Dataset):
         points_trans = self.transform.apply_coords(points_np, original_size)
         points_torch = torch.as_tensor(points_trans).float()
 
+        # 【新增】获取 BBox 用于可视化 (Normalized [xmin, ymin, xmax, ymax])
+        # 假设 json 中 bbox 字段名为 'bbox'
+        bbox_norm = torch.tensor(gaze_data.get('bbox', [0, 0, 0, 0]), dtype=torch.float32)
+        
+        # 【新增】传递原始 Gaze 坐标用于可视化 (Normalized [x, y])
+        gaze_center_norm = torch.tensor([g_norm['x'], g_norm['y']], dtype=torch.float32)
+
         return {
             "image": input_image_torch,
             "original_size": torch.tensor(original_size), 
             "point_coords": points_torch,                 # (2, 2)
             "img_path": img_path,
             "original_idx": original_idx,
-            "gaze_idx": gaze_idx
+            "gaze_idx": gaze_idx,
+            "bbox_norm": bbox_norm,           # For Visualization
+            "gaze_center_norm": gaze_center_norm # For Visualization
         }
 
 def collate_fn(batch):
@@ -142,7 +155,9 @@ def collate_fn(batch):
         "point_coords": torch.stack([x["point_coords"] for x in batch]), # (B, 2, 2)
         "img_path": [x["img_path"] for x in batch],
         "original_idx": [x["original_idx"] for x in batch],
-        "gaze_idx": [x["gaze_idx"] for x in batch]
+        "gaze_idx": [x["gaze_idx"] for x in batch],
+        "bbox_norm": torch.stack([x["bbox_norm"] for x in batch]),
+        "gaze_center_norm": torch.stack([x["gaze_center_norm"] for x in batch])
     }
 
 # =========================================================
@@ -159,6 +174,9 @@ def worker_process(gpu_id, json_files, checkpoint_path):
 
     pixel_mean = torch.tensor([123.675, 116.28, 103.53], device=device).view(-1, 1, 1)
     pixel_std = torch.tensor([58.395, 57.12, 57.375], device=device).view(-1, 1, 1)
+
+    # 【新增】确保可视化目录存在
+    os.makedirs(CHECK_MASK_DIR, exist_ok=True)
 
     for json_path in json_files:
         print(f"[GPU {gpu_id}] Processing JSON: {os.path.basename(json_path)}")
@@ -227,23 +245,37 @@ def worker_process(gpu_id, json_files, checkpoint_path):
                 
                 # --- Loop Decoder ---
                 low_res_masks_list = []
+                
+                # 由于 mask_decoder 不支持 batch prompt (在某些版本)，这里还是循环处理比较稳
+                # 或者如果你确定显存够，可以直接 batch 喂进去，但这里为了改动最小，保持循环结构
                 for i in range(len(image_embeddings)):
                     img_emb = image_embeddings[i:i+1] 
                     sparse_emb = sparse_embeddings[i:i+1]
                     dense_emb = dense_embeddings[i:i+1]
                     
-                    low_res_masks_i, _ = sam.mask_decoder(
+                    # [修正 1] 开启多 Mask 输出
+                    low_res_masks_i, iou_preds_i = sam.mask_decoder(
                         image_embeddings=img_emb,
                         image_pe=sam.prompt_encoder.get_dense_pe(),
                         sparse_prompt_embeddings=sparse_emb,
                         dense_prompt_embeddings=dense_emb,
-                        multimask_output=False,
+                        multimask_output=True,  # <--- 改为 True
                     )
-                    low_res_masks_list.append(low_res_masks_i)
+                    
+                    # [修正 2] 挑选分数最高的 Mask
+                    # iou_preds_i shape: (1, 3)
+                    best_idx = torch.argmax(iou_preds_i, dim=1) # 找到分最高的索引
+                    
+                    # low_res_masks_i shape: (1, 3, 256, 256)
+                    # 取出最好的那个 mask
+                    best_mask = low_res_masks_i[0, best_idx] # (1, 256, 256)
+                    
+                    low_res_masks_list.append(best_mask)
                 
-                low_res_masks = torch.cat(low_res_masks_list, dim=0)
+                # 堆叠回 Batch
+                low_res_masks = torch.cat(low_res_masks_list, dim=0) # (B, 1, 256, 256)
 
-                # --- Post Processing ---
+                # --- Post Processing (保持不变) ---
                 masks = F.interpolate(
                     low_res_masks,
                     size=(1024, 1024),
@@ -253,6 +285,10 @@ def worker_process(gpu_id, json_files, checkpoint_path):
                 
                 masks_np = masks.squeeze(1).cpu().numpy() # (B, 1024, 1024)
                 
+                # 获取可视化所需的 BBox 和 Gaze 点 (CPU)
+                bbox_norms = batch["bbox_norm"].numpy()
+                gaze_centers = batch["gaze_center_norm"].numpy()
+
                 for k in range(len(masks_np)):
                     orig_h, orig_w = original_sizes[k]
                     scale = 1024.0 / max(orig_h, orig_w)
@@ -271,6 +307,46 @@ def worker_process(gpu_id, json_files, checkpoint_path):
                     
                     data[o_idx]['gazes'][g_idx]['seg_mask_path'] = save_path
                     processed_count += 1
+
+                    # =========================================================
+                    # 【新增】可视化检查逻辑
+                    # =========================================================
+                    if processed_count % VIS_INTERVAL == 0:
+                        try:
+                            # 重新读取原图 (最安全，不经过 resize/padding 的逆变换)
+                            check_img = cv2.imread(img_path)
+                            if check_img is not None:
+                                h_curr, w_curr = check_img.shape[:2]
+                                
+                                # 1. 绘制 Observer BBox (蓝色)
+                                bx1, by1, bx2, by2 = bbox_norms[k]
+                                x1, y1 = int(bx1 * w_curr), int(by1 * h_curr)
+                                x2, y2 = int(bx2 * w_curr), int(by2 * h_curr)
+                                cv2.rectangle(check_img, (x1, y1), (x2, y2), (255, 0, 0), 3) # Blue
+                                cv2.putText(check_img, 'Observer', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
+
+                                # 2. 绘制 Gaze Point (红色实心圆)
+                                gx, gy = gaze_centers[k]
+                                cx, cy = int(gx * w_curr), int(gy * h_curr)
+                                cv2.circle(check_img, (cx, cy), 10, (0, 0, 255), -1) # Red filled
+                                cv2.putText(check_img, 'Gaze', (cx+15, cy), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+
+                                # 3. 叠加 Mask (绿色透明)
+                                # mask_binary 是单通道，需要转 3 通道
+                                color_mask = np.zeros_like(check_img)
+                                color_mask[:, :, 1] = mask_binary # Green Channel
+                                
+                                # 仅在 Mask 区域进行加权叠加
+                                mask_bool = mask_binary > 0
+                                check_img[mask_bool] = cv2.addWeighted(check_img[mask_bool], 0.6, color_mask[mask_bool], 0.4, 0)
+
+                                # 4. 保存检查图
+                                file_name = os.path.basename(img_path)
+                                check_save_name = f"CHECK_{dataset_name_clean}_{o_idx}_{g_idx}_{file_name}"
+                                cv2.imwrite(os.path.join(CHECK_MASK_DIR, check_save_name), check_img)
+                        except Exception as e:
+                            print(f"[Warning] Vis failed: {e}")
+                    # =========================================================
                 
                 if processed_count % SAVE_INTERVAL == 0:
                     with open(output_json_path, 'w') as f:
