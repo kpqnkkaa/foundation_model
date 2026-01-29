@@ -24,15 +24,15 @@ SAM_CHECKPOINT = os.path.join(CHECKPOINT_DIR, MODEL_FILENAME)
 JSON_ROOT_DIR = '/mnt/nvme1n1/lululemon/xjj/result/information_fusion'
 MASK_ROOT_DIR = '/mnt/nvme1n1/lululemon/xjj/datasets/Gaze_Masks'
 
-# 【新增】可视化检查结果保存路径
+# 【可视化检查配置】
 CHECK_MASK_DIR = '/mnt/nvme1n1/lululemon/xjj/datasets/check_Gaze_masks'
-VIS_INTERVAL = 50  # 每隔多少张图片保存一张可视化结果用于检查
+VIS_INTERVAL = 50  # 每隔多少张图片保存一张可视化结果
 
 TARGET_GPUS = [2, 3] 
 
 # 【核心参数】
-BATCH_SIZE = 8        # H100 上 vit_h 可以尝试 32-48
-NUM_WORKERS = 16      # CPU 预处理线程数
+BATCH_SIZE = 8        
+NUM_WORKERS = 16      
 SAVE_INTERVAL = 1000 
 # ===========================================
 
@@ -68,7 +68,7 @@ def get_mask_save_path(mask_root_dir, img_path, gaze_idx):
     return save_dir, save_path
 
 # =========================================================
-# 核心修改：Dataset 读取 + Key 修改 + 文本提取
+# Dataset: 增加 Box 生成逻辑
 # =========================================================
 class SAMInferenceDataset(Dataset):
     def __init__(self, items, mask_root_dir):
@@ -82,11 +82,9 @@ class SAMInferenceDataset(Dataset):
         return len(self.items)
 
     def __getitem__(self, idx):
-        # item 结构: (json_idx, gaze_idx, item_dict, gaze_dict)
         original_idx, gaze_idx, item_data, gaze_data = self.items[idx]
         
         img_path = item_data['img_path']
-        
         image = cv2.imread(img_path)
         if image is None: return None
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -97,79 +95,82 @@ class SAMInferenceDataset(Dataset):
         input_image = self.transform.apply_image(image)
         input_image_torch = torch.as_tensor(input_image).permute(2, 0, 1).float() 
         
-        # 2. 坐标提取 (Gaze & Eye)
-        # Point 1: Gaze Point (正样本)
+        # 2. 坐标提取
         g_norm = gaze_data['gaze_point_norm']
         gx, gy = g_norm['x'] * w, g_norm['y'] * h
         
-        # Point 2: Eye Point (负样本，用于排除人脸/身体)
+        # 负样本 Eye Point
         e_norm = item_data['eye_point_norm']
         ex, ey = e_norm['x'] * w, e_norm['y'] * h
         
-        # 组合坐标点: shape (2, 2) -> [[gx, gy], [ex, ey]]
+        # Point Coords
         points_np = np.array([[gx, gy], [ex, ey]])
-        
-        # 变换坐标以匹配 resize 后的图片
         points_trans = self.transform.apply_coords(points_np, original_size)
         points_torch = torch.as_tensor(points_trans).float()
 
-        # 【修改 1】使用 "head_bbox_norm" 获取 BBox
-        bbox_norm = torch.tensor(gaze_data.get('head_bbox_norm', [0, 0, 0, 0]), dtype=torch.float32)
+        # 【关键修改】生成 Box Prompt (20x20 像素)
+        # 以 Gaze Point 为中心
+        box_size = 20 
+        x_min = max(0, gx - box_size/2)
+        y_min = max(0, gy - box_size/2)
+        x_max = min(w, gx + box_size/2)
+        y_max = min(h, gy + box_size/2)
         
-        # 传递原始 Gaze 坐标用于可视化 (Normalized [x, y])
-        gaze_center_norm = torch.tensor([g_norm['x'], g_norm['y']], dtype=torch.float32)
+        box_np = np.array([[x_min, y_min, x_max, y_max]])
+        # Box 也需要变换到 SAM 的尺寸
+        box_trans = self.transform.apply_boxes(box_np, original_size)
+        box_torch = torch.as_tensor(box_trans).float() # (1, 4)
 
-        # 【修改 2】提取 gaze_point_expressions 的第一条作为文本
+        # 辅助信息
+        bbox_norm = torch.tensor(item_data["head_bbox_norm"])
+        gaze_center_norm = torch.tensor([g_norm['x'], g_norm['y']], dtype=torch.float32)
+        
         expr_list = gaze_data.get('gaze_point_expressions', [])
-        if isinstance(expr_list, list) and len(expr_list) > 0:
-            expression_text = str(expr_list[0])
-        else:
-            expression_text = "N/A"
+        expression_text = str(expr_list[0]) if isinstance(expr_list, list) and len(expr_list) > 0 else "N/A"
 
         return {
             "image": input_image_torch,
             "original_size": torch.tensor(original_size), 
-            "point_coords": points_torch,                 # (2, 2)
+            "point_coords": points_torch,                 
+            "box_coords": box_torch,          # 【新增】Box Tensor
             "img_path": img_path,
             "original_idx": original_idx,
             "gaze_idx": gaze_idx,
-            "bbox_norm": bbox_norm,           # For Visualization
-            "gaze_center_norm": gaze_center_norm, # For Visualization
-            "expression_text": expression_text # 【新增】文本
+            "bbox_norm": bbox_norm,           
+            "gaze_center_norm": gaze_center_norm, 
+            "expression_text": expression_text 
         }
 
 def collate_fn(batch):
     batch = [x for x in batch if x is not None]
     if len(batch) == 0: return None
     
-    # Pad Images
     images = [x["image"] for x in batch]
     max_h, max_w = 1024, 1024
     padded_images = []
-    
     for img in images:
         h, w = img.shape[-2:]
         padh = max_h - h
         padw = max_w - w
         padded_img = F.pad(img, (0, padw, 0, padh))
         padded_images.append(padded_img)
-        
     batch_images = torch.stack(padded_images)
     
     return {
         "image": batch_images, 
         "original_size": torch.stack([x["original_size"] for x in batch]),
-        "point_coords": torch.stack([x["point_coords"] for x in batch]), # (B, 2, 2)
+        "point_coords": torch.stack([x["point_coords"] for x in batch]),
+        "box_coords": torch.stack([x["box_coords"] for x in batch]), # 【新增】Stack Boxes
         "img_path": [x["img_path"] for x in batch],
         "original_idx": [x["original_idx"] for x in batch],
         "gaze_idx": [x["gaze_idx"] for x in batch],
         "bbox_norm": torch.stack([x["bbox_norm"] for x in batch]),
         "gaze_center_norm": torch.stack([x["gaze_center_norm"] for x in batch]),
-        "expression_text": [x["expression_text"] for x in batch] # 【新增】list of strings
+        "expression_text": [x["expression_text"] for x in batch] 
     }
 
 # =========================================================
-# 核心工作进程
+# Worker Process
 # =========================================================
 def worker_process(gpu_id, json_files, checkpoint_path):
     torch.cuda.set_device(gpu_id)
@@ -187,24 +188,18 @@ def worker_process(gpu_id, json_files, checkpoint_path):
 
     for json_path in json_files:
         print(f"[GPU {gpu_id}] Processing JSON: {os.path.basename(json_path)}")
-        
         output_json_path = json_path.replace(".json", "_with_SEG.json")
         dataset_name_clean = os.path.basename(json_path).replace('.json', '')
         current_mask_root = os.path.join(MASK_ROOT_DIR, dataset_name_clean)
 
-        with open(json_path, 'r') as f:
-            data = json.load(f)
+        with open(json_path, 'r') as f: data = json.load(f)
             
-        # 1. 过滤任务: 只处理 inout=1 的
         tasks = []
         for i, item in enumerate(data):
             if 'gazes' in item:
                 for j, gaze in enumerate(item['gazes']):
-                    # 检查是否已存在
                     if 'seg_mask_path' in gaze and gaze['seg_mask_path'] and os.path.exists(gaze['seg_mask_path']):
                         continue
-                    
-                    # 确保关键键存在
                     if gaze.get('inout', 0) == 1 and 'gaze_point_norm' in gaze and 'eye_point_norm' in item:
                         tasks.append((i, j, item, gaze))
 
@@ -213,15 +208,7 @@ def worker_process(gpu_id, json_files, checkpoint_path):
             continue
 
         dataset = SAMInferenceDataset(tasks, current_mask_root)
-        loader = DataLoader(
-            dataset, 
-            batch_size=BATCH_SIZE, 
-            shuffle=False, 
-            num_workers=NUM_WORKERS, 
-            collate_fn=collate_fn,
-            pin_memory=True,
-            drop_last=False
-        )
+        loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, collate_fn=collate_fn, pin_memory=True, drop_last=False)
 
         print(f"[GPU {gpu_id}] Batch inference on {len(tasks)} items...")
         processed_count = 0
@@ -231,24 +218,29 @@ def worker_process(gpu_id, json_files, checkpoint_path):
                 if batch is None: continue
 
                 input_images = (batch["image"].to(device) - pixel_mean) / pixel_std 
-                point_coords = batch["point_coords"].to(device) # (B, 2, 2)
+                point_coords = batch["point_coords"].to(device) 
+                # 【修改】获取 Box 并去掉多余维度 (B, 1, 4) -> (B, 4) if needed, SAM needs (B, N, 4)
+                # SAM prompt encoder expects boxes as (B, N, 4). Our dataset returns (1, 4).
+                # Collate makes it (B, 1, 4). This is correct.
+                box_coords = batch["box_coords"].to(device) 
+                
                 original_sizes = batch["original_size"]
                 
-                # 构建 Labels: [1, 0] -> 正样本, 负样本
                 B = point_coords.shape[0]
                 point_labels = torch.tensor([[1, 0]] * B, dtype=torch.int, device=device)
 
-                # --- Batch Encoder ---
+                # --- Encoder ---
                 image_embeddings = sam.image_encoder(input_images)
 
-                # --- Batch Prompt Encoder ---
+                # --- Prompt Encoder (传入 Boxes) ---
+                # points 和 boxes 同时传，SAM 会计算两者的交集
                 sparse_embeddings, dense_embeddings = sam.prompt_encoder(
                     points=(point_coords, point_labels),
-                    boxes=None,
+                    boxes=box_coords, # 【关键】传入 Box
                     masks=None,
                 )
                 
-                # --- Loop Decoder (多 Mask + 置信度筛选) ---
+                # --- Decoder (Loop + Area/IoU Filter) ---
                 low_res_masks_list = []
                 
                 for i in range(len(image_embeddings)):
@@ -256,7 +248,6 @@ def worker_process(gpu_id, json_files, checkpoint_path):
                     sparse_emb = sparse_embeddings[i:i+1]
                     dense_emb = dense_embeddings[i:i+1]
                     
-                    # 开启 Multimask
                     low_res_masks_i, iou_preds_i = sam.mask_decoder(
                         image_embeddings=img_emb,
                         image_pe=sam.prompt_encoder.get_dense_pe(),
@@ -265,30 +256,36 @@ def worker_process(gpu_id, json_files, checkpoint_path):
                         multimask_output=True, 
                     )
                     
-                    # 选置信度最高的 mask
-                    best_idx = torch.argmax(iou_preds_i, dim=1).item()
+                    # 智能筛选策略
+                    pred_masks_binary = (low_res_masks_i > 0.0).float()
+                    areas = torch.sum(pred_masks_binary, dim=(2, 3)) 
                     
-                    # 恢复维度 (1, 1, 256, 256)
-                    best_mask = low_res_masks_i[0, best_idx].unsqueeze(0).unsqueeze(0)
+                    sorted_indices = torch.argsort(iou_preds_i, dim=1, descending=True)
+                    best_idx = sorted_indices[0, 0].item()
+                    second_idx = sorted_indices[0, 1].item()
                     
+                    best_score = iou_preds_i[0, best_idx].item()
+                    second_score = iou_preds_i[0, second_idx].item()
+                    best_area = areas[0, best_idx].item()
+                    second_area = areas[0, second_idx].item()
+                    
+                    final_idx = best_idx
+                    if second_area < (best_area * 0.6) and second_score > (best_score * 0.85):
+                         if second_area > 10: 
+                             final_idx = second_idx
+
+                    best_mask = low_res_masks_i[0, final_idx].unsqueeze(0).unsqueeze(0)
                     low_res_masks_list.append(best_mask)
                 
                 low_res_masks = torch.cat(low_res_masks_list, dim=0)
 
                 # --- Post Processing ---
-                masks = F.interpolate(
-                    low_res_masks,
-                    size=(1024, 1024),
-                    mode="bilinear",
-                    align_corners=False,
-                )
+                masks = F.interpolate(low_res_masks, size=(1024, 1024), mode="bilinear", align_corners=False)
+                masks_np = masks.squeeze(1).cpu().numpy()
                 
-                masks_np = masks.squeeze(1).cpu().numpy() # (B, 1024, 1024)
-                
-                # 获取可视化所需数据 (CPU)
                 bbox_norms = batch["bbox_norm"].numpy()
                 gaze_centers = batch["gaze_center_norm"].numpy()
-                expressions = batch["expression_text"] # list of strings
+                expressions = batch["expression_text"]
 
                 for k in range(len(masks_np)):
                     orig_h, orig_w = original_sizes[k]
@@ -309,65 +306,53 @@ def worker_process(gpu_id, json_files, checkpoint_path):
                     data[o_idx]['gazes'][g_idx]['seg_mask_path'] = save_path
                     processed_count += 1
 
-                    # =========================================================
-                    # 可视化检查逻辑 (包含 Title)
-                    # =========================================================
+                    # --- 可视化检查 ---
                     if processed_count % VIS_INTERVAL == 0:
                         try:
                             check_img = cv2.imread(img_path)
                             if check_img is not None:
                                 h_curr, w_curr = check_img.shape[:2]
                                 
-                                # 1. 绘制 Observer BBox (蓝色)
+                                # 1. Head BBox (Blue)
                                 bx1, by1, bx2, by2 = bbox_norms[k]
-                                x1, y1 = int(bx1 * w_curr), int(by1 * h_curr)
-                                x2, y2 = int(bx2 * w_curr), int(by2 * h_curr)
-                                cv2.rectangle(check_img, (x1, y1), (x2, y2), (255, 0, 0), 3) # Blue
-                                # 标个 Head
-                                cv2.putText(check_img, 'Head', (x1, max(y1-10, 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
+                                cv2.rectangle(check_img, (int(bx1*w_curr), int(by1*h_curr)), (int(bx2*w_curr), int(by2*h_curr)), (255, 0, 0), 3)
+                                cv2.putText(check_img, 'Head', (int(bx1*w_curr), max(int(by1*h_curr)-10, 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
 
-                                # 2. 绘制 Gaze Point (红色实心圆)
+                                # 2. Gaze Point (Red)
                                 gx, gy = gaze_centers[k]
                                 cx, cy = int(gx * w_curr), int(gy * h_curr)
-                                cv2.circle(check_img, (cx, cy), 8, (0, 0, 255), -1) # Red filled
+                                cv2.circle(check_img, (cx, cy), 8, (0, 0, 255), -1)
                                 
-                                # 3. 叠加 Mask (绿色透明)
+                                # 3. 【新增】Gaze Box Prompt (Yellow) - 让你看到 SAM 实际的输入框
+                                box_size_vis = 20 # 这里只是近似画一下，实际逻辑在 Dataset 里
+                                cv2.rectangle(check_img, (cx-10, cy-10), (cx+10, cy+10), (0, 255, 255), 2)
+
+                                # 4. Mask (Green)
                                 color_mask = np.zeros_like(check_img)
                                 color_mask[:, :, 1] = mask_binary 
                                 mask_bool = mask_binary > 0
                                 check_img[mask_bool] = cv2.addWeighted(check_img[mask_bool], 0.6, color_mask[mask_bool], 0.4, 0)
 
-                                # 4. 【修改】绘制 Title (Text Expression)
-                                # 黑色描边 + 白色字体，防止背景太亮看不清
+                                # 5. Title
                                 text_str = expressions[k]
-                                # 截断太长的文本防止报错
                                 text_str = text_str[:100] + "..." if len(text_str) > 100 else text_str
-                                
-                                text_pos = (10, 30)
-                                # 黑色描边
-                                cv2.putText(check_img, text_str, text_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
-                                # 白色内芯
-                                cv2.putText(check_img, text_str, text_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                                cv2.putText(check_img, text_str, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
+                                cv2.putText(check_img, text_str, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
-                                # 5. 保存
                                 file_name = os.path.basename(img_path)
                                 check_save_name = f"CHECK_{dataset_name_clean}_{o_idx}_{g_idx}_{file_name}"
                                 cv2.imwrite(os.path.join(CHECK_MASK_DIR, check_save_name), check_img)
                         except Exception as e:
                             print(f"[Warning] Vis failed: {e}")
-                    # =========================================================
                 
                 if processed_count % SAVE_INTERVAL == 0:
-                    with open(output_json_path, 'w') as f:
-                        json.dump(data, f, indent=2)
+                    with open(output_json_path, 'w') as f: json.dump(data, f, indent=2)
 
-        with open(output_json_path, 'w') as f:
-            json.dump(data, f, indent=2)
-            
+        with open(output_json_path, 'w') as f: json.dump(data, f, indent=2)
     print(f"[GPU {gpu_id}] Finished all files.")
 
 # =========================================================
-# 主函数
+# Main
 # =========================================================
 def main():
     try: mp.set_start_method('spawn', force=True)
