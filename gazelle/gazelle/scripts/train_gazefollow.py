@@ -62,40 +62,85 @@ def visualize_step(image_path, preds, bbox, gt_point, save_path):
     fig, ax = plt.subplots(1, figsize=(10, 10))
     ax.imshow(img)
 
-    # 1. Observer BBox (蓝色) - bbox 传入应为 [x1, y1, x2, y2]
+    # 1. Observer BBox (蓝色) - bbox: [x1, y1, x2, y2] (Normalized)
     bx1, by1, bx2, by2 = bbox
     rect = patches.Rectangle((bx1*w, by1*h), (bx2-bx1)*w, (by2-by1)*h, 
                              linewidth=3, edgecolor='blue', facecolor='none', label='Observer')
     ax.add_patch(rect)
 
-    # 2. GT Point (蓝色)
+    # 2. GT Point (蓝色圆点)
     ax.scatter(gt_point[0]*w, gt_point[1]*h, c='blue', s=120, marker='o', edgecolors='white', label='GT')
 
-    # 3. Pred Point (绿色)
+    # 3. Pred Point (绿色叉号)
     if 'heatmap' in preds and preds['heatmap'] is not None:
-        hm = preds['heatmap'].detach().cpu().squeeze().numpy() # 确保是 [64, 64]
-        if hm.ndim > 2: hm = hm[0] # 防止有残留的 batch/channel 维度
+        hm = preds['heatmap'].detach().cpu().squeeze().numpy()
+        if hm.ndim > 2: hm = hm[0]
         idx = np.unravel_index(np.argmax(hm), hm.shape)
+        # heatmap coordinate -> image coordinate
         pred_y, pred_x = idx[0] * (h / hm.shape[0]), idx[1] * (w / hm.shape[1])
-        ax.scatter(pred_x, pred_y, c='lime', s=150, marker='x', linewidths=3, label='Pred')
+        ax.scatter(pred_x, pred_y, c='lime', s=150, marker='x', linewidths=3, label='Pred Point')
 
-    # 4. Seg Mask (绿色透明层) - 修正 ValueError
+    # 4. Seg Mask (绿色透明层)
     if 'seg' in preds and preds['seg'] is not None:
         seg = torch.sigmoid(preds['seg']).detach().cpu().squeeze().numpy()
-        # 核心修正：如果 seg 是 [H, W, C] 或 [C, H, W]，只取第一个通道
-        if seg.ndim == 3:
-            seg = seg[0] # 取第一层 Mask
-            
-        seg_resized = cv2.resize(seg, (w, h)) # 此时 seg_resized 形状为 (h, w)
-        
+        if seg.ndim == 3: seg = seg[0]
+        seg_resized = cv2.resize(seg, (w, h))
         mask_overlay = np.zeros((h, w, 4))
         mask_overlay[..., 1] = 1.0  # Green
-        mask_overlay[..., 3] = seg_resized * 0.6  # Alpha 赋值
+        mask_overlay[..., 3] = seg_resized * 0.6
         ax.imshow(mask_overlay)
+
+    # 5. [修改] Direction Arrow (黄色箭头)
+    if 'direction' in preds and preds['direction'] is not None:
+        dir_data = preds['direction'].detach().cpu()
+        # 获取分类索引 (0-7)
+        if dir_data.ndim > 0 and dir_data.shape[-1] == 8:
+            dir_idx = torch.argmax(dir_data).item()
+        else:
+            dir_idx = dir_data.item()
+
+        # 定义每个 Label 对应的数学角度 (标准逆时针: 0度为右, 90度为上)
+        # Label定义: 0:R, 1:TR, 2:Top, 3:TL, 4:L, 5:BL, 6:Bottom, 7:BR
+        idx_to_angle = {
+            0: 0,    # Right
+            1: 45,   # Top-Right
+            2: 90,   # Above (Top)
+            3: 135,  # Top-Left
+            4: 180,  # Left
+            5: 225,  # Bottom-Left
+            6: 270,  # Below (Bottom)
+            7: 315   # Bottom-Right
+        }
+        
+        if dir_idx in idx_to_angle:
+            angle_deg = idx_to_angle[dir_idx]
+            angle_rad = math.radians(angle_deg)
+
+            # 计算箭头长度 (图像宽度的 15%)
+            arrow_len = w * 0.15
+            
+            # 计算偏移量 (dx, dy)
+            # 注意: 图像坐标系中 y 是向下的，而 math.sin 假设 y 向上
+            # 所以 "Top/Above" (90度) 时 sin(90)=1, 我们需要 dy 为负值才能往上画
+            dx = math.cos(angle_rad) * arrow_len
+            dy = -math.sin(angle_rad) * arrow_len 
+
+            # 起点：BBox 中心
+            cx = (bx1 + bx2) / 2 * w
+            cy = (by1 + by2) / 2 * h
+            
+            # 绘制箭头
+            ax.arrow(cx, cy, dx, dy, color='yellow', width=w*0.005, head_width=w*0.02, 
+                     length_includes_head=True, label='Pred Dir')
 
     title_str = preds.get('text', "Gaze Detection Output")
     plt.title(f"{title_str}", fontsize=14, color='darkgreen', bbox=dict(facecolor='white', alpha=0.8))
-    plt.legend(loc='upper right')
+    
+    # 整理图例
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    plt.legend(by_label.values(), by_label.keys(), loc='upper right')
+    
     plt.axis('off')
     plt.savefig(save_path, bbox_inches='tight', pad_inches=0.1)
     plt.close()
@@ -435,10 +480,22 @@ def main():
                                 logger.info(f"Epoch {epoch} Sample 0 TokenIDs: {token_ids[:10].tolist()}")
                             pred_text = tokenizer.decode(token_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
 
+                    cur_dir = None
+                    if preds.get('direction') is not None:
+                        dir_output = preds['direction']
+                        # 处理 batch 和 list 情况
+                        if isinstance(dir_output, list):
+                            # 如果是多尺度列表，取最后一层，然后取 batch index
+                            last_scale = dir_output[-1] if isinstance(dir_output[-1], torch.Tensor) else dir_output[0]
+                            cur_dir = last_scale[idx_in_batch] if last_scale.shape[0] > idx_in_batch else last_scale[0]
+                        else:
+                            cur_dir = dir_output[idx_in_batch] if dir_output.shape[0] > idx_in_batch else dir_output[0]
+
                     vis_preds = {
                         'heatmap': cur_hm,
                         'seg': cur_seg,
-                        'text': f"GT: {gt_text}\nPred: {pred_text}"
+                        'text': f"GT: {gt_text}\nPred: {pred_text}",
+                        'direction': cur_dir
                     }
                     
                     vis_save_path = os.path.join(epoch_vis_dir, f"sample_{idx_in_batch}.png")
