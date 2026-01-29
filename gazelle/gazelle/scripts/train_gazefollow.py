@@ -10,6 +10,10 @@ import logging
 from tqdm import tqdm
 import cv2
 import math
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from PIL import Image
+
 from gazelle.backbone import SAMBackboneWrapper 
 from gazelle.model import GazeLLE 
 import torchvision.transforms.functional as F_vis
@@ -25,11 +29,10 @@ from gazelle.model import get_gazelle_model
 from gazelle.utils import gazefollow_auc, gazefollow_l2
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default="dinov2_vitb_lora_mix_est")
+parser.add_argument('--model', type=str, default="dinov2_vitb_lora_multi_output")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--is_mix_gaze_estimation', default=False, action='store_true')
 parser.add_argument('--estimation_batch_size', type=int, default=64, help="Total batch size for estimation data")
-
 parser.add_argument('--eth_label', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Label/train_temp.label')
 parser.add_argument('--eth_img', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/ETH-Gaze/Image')
 parser.add_argument('--gaze360_label', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/Gaze360/Label/train.label')
@@ -45,12 +48,55 @@ parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--n_workers', type=int, default=8)
 args = parser.parse_args()
 
-# --- 辅助函数 ---
+# --- 新增：可视化辅助函数 ---
+def visualize_step(image_path, preds, bboxes, gt_point, save_path):
+    try:
+        img = Image.open(image_path).convert('RGB')
+        w, h = img.size
+        fig, ax = plt.subplots(1, figsize=(10, 10))
+        ax.imshow(img)
+
+        # 1. Observer BBox (蓝色)
+        bx1, by1, bx2, by2 = bboxes[0] # 取第一个 bbox
+        rect = patches.Rectangle((bx1*w, by1*h), (bx2-bx1)*w, (by2-by1)*h, 
+                                 linewidth=3, edgecolor='blue', facecolor='none', label='Observer BBox')
+        ax.add_patch(rect)
+
+        # 2. GT Point (蓝色圆点)
+        ax.scatter(gt_point[0]*w, gt_point[1]*h, c='blue', s=120, marker='o', edgecolors='white', label='GT Point')
+
+        # 3. Pred Point from Heatmap (绿色叉号)
+        if 'heatmap' in preds and preds['heatmap'] is not None:
+            hm = preds['heatmap'].detach().cpu().numpy()
+            idx = np.unravel_index(np.argmax(hm), hm.shape)
+            pred_y, pred_x = idx[0] * (h / hm.shape[0]), idx[1] * (w / hm.shape[1])
+            ax.scatter(pred_x, pred_y, c='lime', s=150, marker='x', linewidths=3, label='Pred Point')
+
+        # 4. Seg Mask (绿色透明层)
+        if 'seg' in preds and preds['seg'] is not None:
+            seg = torch.sigmoid(preds['seg']).detach().cpu().numpy()
+            seg_resized = cv2.resize(seg, (w, h))
+            mask_overlay = np.zeros((h, w, 4))
+            mask_overlay[..., 1] = 1.0 # Green
+            mask_overlay[..., 3] = seg_resized * 0.6 # Alpha
+            ax.imshow(mask_overlay)
+
+        # 5. Text (标题)
+        title_str = preds.get('text', "Gaze Estimation")
+        plt.title(f"Visual Result: {title_str}", fontsize=14, color='darkgreen', bbox=dict(facecolor='white', alpha=0.8))
+        
+        plt.legend(loc='upper right')
+        plt.axis('off')
+        plt.savefig(save_path, bbox_inches='tight', pad_inches=0.1)
+        plt.close()
+    except Exception as e:
+        print(f"Visualization failed: {e}")
+
+# --- 原有辅助函数 ---
 def merge_batches(batches):
     batches = [b for b in batches if b is not None]
     if len(batches) == 0: return None
     if len(batches) == 1: return batches[0]
-    
     merged = []
     num_items = len(batches[0]) 
     for i in range(num_items):
@@ -183,12 +229,8 @@ def main():
             final_batch = merge_batches(batches_to_merge)
             imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask, is_face_crop_mode, gaze3d, has_3d = final_batch
 
-            # =========================================================
-            # [Indices Separation]
-            # =========================================================
             is_est = has_3d.bool().cuda()
             is_gf = ~is_est
-            
             num_gf = is_gf.sum()
             num_est = is_est.sum()
 
@@ -198,93 +240,57 @@ def main():
                 "observer_expression_ids": observer_expressions.cuda(), "gaze_point_expression_ids": gaze_point_expressions.cuda()
             })
             loss = 0.0
-            
-            # 用于记录日志的 Loss (只包含 GF)
-            log_hm_loss = 0.0
-            log_text_loss = 0.0
-            log_seg_loss = 0.0
-            log_dir_loss = 0.0
-            log_g3d_loss = 0.0
+            log_hm_loss = 0.0; log_text_loss = 0.0; log_seg_loss = 0.0; log_dir_loss = 0.0; log_g3d_loss = 0.0
 
-            # --- A. Heatmap Loss (Separate Calculation) ---
             if isinstance(preds['heatmap'], list): heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
             else: heatmap_preds = preds['heatmap'].squeeze(dim=1)
             
-            # 计算 Per-Sample Loss
             pixel_loss = criterion_logits(heatmap_preds, heatmaps.cuda())
-            loss_per_sample_hm = pixel_loss.mean(dim=(1, 2)) # [B]
+            loss_per_sample_hm = pixel_loss.mean(dim=(1, 2))
             
-            # 1. GF Heatmap (主任务)
             if num_gf > 0:
                 loss_hm_gf = loss_per_sample_hm[is_gf].mean()
-                loss += loss_hm_gf # 权重 1.0
+                loss += loss_hm_gf
                 log_hm_loss = loss_hm_gf.item()
-            else:
-                loss_hm_gf = torch.tensor(0.0)
 
-            # 2. Est Heatmap (辅助任务: 学习全0)
             if num_est > 0:
                 loss_hm_est = loss_per_sample_hm[is_est].mean()
-                loss += loss_hm_est * 0.1 # 权重 0.01
+                loss += loss_hm_est * 0.1 
             
-            # --- B. Seg Loss (Separate) ---
             if preds['seg'] is not None:
                 if isinstance(preds['seg'], list): seg_preds = torch.stack(preds['seg']).squeeze(dim=1)
                 else: seg_preds = preds['seg'].squeeze(dim=1)
-                
                 seg_loss_per_sample = criterion_logits(seg_preds, seg_mask.cuda()).mean(dim=(1,2))
-                
                 if num_gf > 0:
                     loss_seg_gf = seg_loss_per_sample[is_gf].mean()
-                    loss += loss_seg_gf * 0.1 # 原有权重
+                    loss += loss_seg_gf * 0.1
                     log_seg_loss = loss_seg_gf.item()
-                
                 if num_est > 0:
                     loss_seg_est = seg_loss_per_sample[is_est].mean()
-                    loss += loss_seg_est * 0.1 * 0.1 # 更小的辅助权重
+                    loss += loss_seg_est * 0.1 * 0.1
 
-            # --- C. Text Loss ---
-            # --- C. Text Loss (Weighted) ---
             if preds['text_loss'] is not None:
-                # preds['text_loss'] 现在是 [B] 维度的 Tensor
-                
-                # 1. GazeFollow (主任务，记录日志)
                 if num_gf > 0:
                     loss_text_gf = preds['text_loss'][is_gf].mean()
-                    loss += loss_text_gf * 0.01 # 原始权重
+                    loss += loss_text_gf * 0.01
                     log_text_loss = loss_text_gf.item()
-                
-                # 2. Estimation (辅助任务，outside of image，给小权重)
                 if num_est > 0:
                     loss_text_est = preds['text_loss'][is_est].mean()
-                    loss += loss_text_est * 0.01 * 0.1 # 额外乘 0.1 的缩小系数
+                    loss += loss_text_est * 0.01 * 0.1
 
-            # --- D. Direction Loss ---
-            # Est 数据标签是 -100，Loss 自动为 0。所以计算出的 Loss 本身就是纯 GF 的。
             if preds['direction'] is not None and num_gf > 0:
                 if isinstance(preds['direction'], list): dir_preds = torch.stack(preds['direction']).squeeze(dim=1)
                 else: dir_preds = preds['direction'].squeeze(dim=1)
-                
                 clean_target = gaze_directions.clone()
                 clean_target[(clean_target < 0) | (clean_target >= 8)] = -100
-                
-                # 这里 Est 的样本 Loss 为 0，均值会被 Est 样本数量稀释
-                # 严格来说应该只对 GF 求 mean
-                dir_loss_raw = criterion_ce(dir_preds, clean_target.cuda()) # Scalar Mean
-                
-                # 如果 criterion_ce 是 mean reduction，我们无法剔除 Est 的分母影响。
-                # 但这通常影响不大。如果非常严格，需要把 criterion 改为 reduction='none'。
+                dir_loss_raw = criterion_ce(dir_preds, clean_target.cuda())
                 loss += dir_loss_raw * 0.02
                 log_dir_loss = dir_loss_raw.item()
 
-            # --- E. Gaze 3D Loss (Est Only) ---
             if preds['gaze3d'] is not None and args.is_mix_gaze_estimation:
                 if isinstance(preds['gaze3d'], list): gaze3d_preds = torch.stack(preds['gaze3d']).squeeze(dim=1)
                 else: gaze3d_preds = preds['gaze3d'].squeeze(dim=1)
-                
                 loss_gaze3d_raw = F.l1_loss(gaze3d_preds, gaze3d.cuda(), reduction='none').mean(dim=1)
-                
-                # 只有 Est 有效
                 if num_est > 0:
                     loss_g3d_est = loss_gaze3d_raw[is_est].mean()
                     loss += loss_g3d_est * 0.1
@@ -293,17 +299,13 @@ def main():
             loss.backward()
             optimizer.step()
             
-            # --- Logging (Only GF metrics where possible) ---
-            print_dict = {}
-            print_dict['heatmap_loss'] = log_hm_loss # Pure GF
+            print_dict = {'heatmap_loss': log_hm_loss, 'total_loss': loss.item()}
             if preds['text_loss'] is not None: print_dict['text_loss'] = log_text_loss
-            if preds['direction'] is not None: print_dict['direction_loss'] = log_dir_loss # Mostly GF
-            if preds['seg'] is not None: print_dict['seg_loss'] = log_seg_loss # Pure GF
-            if preds['gaze3d'] is not None: print_dict['gaze3d_loss'] = log_g3d_loss # Pure Est
-            print_dict['total_loss'] = loss.item()
+            if preds['direction'] is not None: print_dict['direction_loss'] = log_dir_loss
+            if preds['seg'] is not None: print_dict['seg_loss'] = log_seg_loss
+            if preds['gaze3d'] is not None: print_dict['gaze3d_loss'] = log_g3d_loss
             
             pbar.set_postfix(print_dict)
-
             if cur_iter % args.log_iter == 0: 
                 wandb.log(print_dict)
                 logger.info(f"Iter {cur_iter}/{len(train_dl_gf)} "+", ".join([f"{k}: {v:.4f}" for k, v in print_dict.items()]))
@@ -313,6 +315,7 @@ def main():
         model_to_save = model.module if hasattr(model, 'module') else model
         torch.save(model_to_save.get_gazelle_state_dict(), ckpt_path_last)
 
+        # --- Evaluation & Visualization ---
         logger.info(f"[Epoch {epoch} Evaluation]")
         model.eval()
         avg_l2s, min_l2s, aucs = [], [], []
@@ -320,13 +323,35 @@ def main():
              imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask, is_face_crop_mode, gaze3d, has_3d = batch
              with torch.no_grad():
                 preds = model({"images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, "observer_expression_ids": observer_expressions.cuda()})
+             
              if isinstance(preds['heatmap'], list): heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
              else: heatmap_preds = preds['heatmap'].squeeze(dim=1)
              heatmap_preds = heatmap_preds.cpu()
+             
+             # 在 Eval 的第一个 batch 进行一次可视化
+             if cur_iter == 0:
+                idx = 0 # 选 batch 里的第一个样本
+                vis_preds = {
+                    'heatmap': heatmap_preds[idx],
+                    'seg': preds['seg'][idx] if preds['seg'] is not None else None,
+                    'text': "Epoch Evaluation - Gaze Detection" 
+                }
+                # 注意：这里需要原始图片路径，如果是 GazeDataset，可以通过 eval_dataset.img_names 获取
+                # 但 eval_dl 返回的是经过变换的 Tensor。为了演示，我们假设用 batch 里的信息尝试恢复
+                vis_save_path = os.path.join(exp_dir, f"vis_epoch_{epoch}.png")
+                # 如果数据集能提供 path 信息则更佳，此处暂用 placeholder 逻辑
+                try:
+                    img_path = eval_dataset.images[idx] # 假设数据集有 images 属性
+                    visualize_step(img_path, vis_preds, [bboxes[idx]], [gazex[idx][0], gazey[idx][0]], vis_save_path)
+                    logger.info(f"Visualization saved to {vis_save_path}")
+                except:
+                    pass
+
              for i in range(heatmap_preds.shape[0]):
                 auc = gazefollow_auc(heatmap_preds[i], gazex[i], gazey[i], heights[i], widths[i])
                 avg_l2, min_l2 = gazefollow_l2(heatmap_preds[i], gazex[i], gazey[i])
                 aucs.append(auc); avg_l2s.append(avg_l2); min_l2s.append(min_l2)
+                
         epoch_min_l2 = np.mean(min_l2s)
         epoch_avg_l2 = np.mean(avg_l2s)
         epoch_auc = np.mean(aucs)
