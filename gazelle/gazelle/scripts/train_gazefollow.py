@@ -1,3 +1,5 @@
+import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import argparse
 from datetime import datetime
 import numpy as np
@@ -13,6 +15,8 @@ import math
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from PIL import Image
+# 新增导入 Tokenizer
+from transformers import GPT2Tokenizer
 
 from gazelle.backbone import SAMBackboneWrapper 
 from gazelle.model import GazeLLE 
@@ -52,44 +56,45 @@ args = parser.parse_args()
 # ==========================================
 # 可视化核心函数
 # ==========================================
-def visualize_step(image_path, preds, bboxes, gt_point, save_path):
+def visualize_step(image_path, preds, bbox, gt_point, save_path):
     img = Image.open(image_path).convert('RGB')
     w, h = img.size
     fig, ax = plt.subplots(1, figsize=(10, 10))
     ax.imshow(img)
 
-    # 1. Observer BBox (蓝色)
-    # bboxes 来自 batch，格式为 [xmin, ymin, xmax, ymax]
-    bx1, by1, bx2, by2 = bboxes[0]
+    # 1. Observer BBox (蓝色) - bbox 传入应为 [x1, y1, x2, y2]
+    bx1, by1, bx2, by2 = bbox
     rect = patches.Rectangle((bx1*w, by1*h), (bx2-bx1)*w, (by2-by1)*h, 
                              linewidth=3, edgecolor='blue', facecolor='none', label='Observer')
     ax.add_patch(rect)
 
-    # 2. GT Point (蓝色圆点)
-    # gt_point 格式为 [x, y]
+    # 2. GT Point (蓝色)
     ax.scatter(gt_point[0]*w, gt_point[1]*h, c='blue', s=120, marker='o', edgecolors='white', label='GT')
 
-    # 3. Pred Point from Heatmap (绿色叉号)
+    # 3. Pred Point (绿色)
     if 'heatmap' in preds and preds['heatmap'] is not None:
-        hm = preds['heatmap'].detach().cpu().numpy() # [64, 64]
+        hm = preds['heatmap'].detach().cpu().squeeze().numpy() # 确保是 [64, 64]
+        if hm.ndim > 2: hm = hm[0] # 防止有残留的 batch/channel 维度
         idx = np.unravel_index(np.argmax(hm), hm.shape)
-        # 将 64x64 坐标映射回原图
         pred_y, pred_x = idx[0] * (h / hm.shape[0]), idx[1] * (w / hm.shape[1])
         ax.scatter(pred_x, pred_y, c='lime', s=150, marker='x', linewidths=3, label='Pred')
 
-    # 4. Seg Mask (绿色透明层)
+    # 4. Seg Mask (绿色透明层) - 修正 ValueError
     if 'seg' in preds and preds['seg'] is not None:
-        seg = torch.sigmoid(preds['seg']).detach().cpu().numpy() # [64, 64]
-        seg_resized = cv2.resize(seg, (w, h))
+        seg = torch.sigmoid(preds['seg']).detach().cpu().squeeze().numpy()
+        # 核心修正：如果 seg 是 [H, W, C] 或 [C, H, W]，只取第一个通道
+        if seg.ndim == 3:
+            seg = seg[0] # 取第一层 Mask
+            
+        seg_resized = cv2.resize(seg, (w, h)) # 此时 seg_resized 形状为 (h, w)
+        
         mask_overlay = np.zeros((h, w, 4))
-        mask_overlay[..., 1] = 1.0 # 绿色通道
-        mask_overlay[..., 3] = seg_resized * 0.6 # 透明度
+        mask_overlay[..., 1] = 1.0  # Green
+        mask_overlay[..., 3] = seg_resized * 0.6  # Alpha 赋值
         ax.imshow(mask_overlay)
 
-    # 5. Text (标题)
-    title_str = preds.get('text', "Gaze Estimation")
+    title_str = preds.get('text', "Gaze Detection Output")
     plt.title(f"{title_str}", fontsize=14, color='darkgreen', bbox=dict(facecolor='white', alpha=0.8))
-    
     plt.legend(loc='upper right')
     plt.axis('off')
     plt.savefig(save_path, bbox_inches='tight', pad_inches=0.1)
@@ -182,6 +187,10 @@ def main():
     os.makedirs(exp_dir, exist_ok=True)
     logger = setup_logger(os.path.join(exp_dir, 'log.txt'))
     
+    # 初始化 Tokenizer 
+    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    tokenizer.pad_token = tokenizer.eos_token
+
     # 初始化模型
     if args.is_mix_gaze_estimation:
         backbone = SAMBackboneWrapper(model_type="vit_b", in_size=(448, 448), backbone_type="dinov2", is_lora=False, is_multi_input=True)
@@ -215,46 +224,49 @@ def main():
     best_min_l2 = 1.0
 
     for epoch in range(args.max_epochs):
-        # model.train()
-        # pbar = tqdm(enumerate(train_dl_gf), total=len(train_dl_gf), desc=f"Epoch {epoch}")
+        model.train()
+        pbar = tqdm(enumerate(train_dl_gf), total=len(train_dl_gf), desc=f"Epoch {epoch}")
         
-        # for cur_iter, batch_gf in pbar:
-        #     batches_to_merge = [batch_gf]
-        #     if args.is_mix_gaze_estimation:
-        #         batches_to_merge.append(next(iter_eth))
-        #         batches_to_merge.append(next(iter_g360))
+        for cur_iter, batch_gf in pbar:
+            batches_to_merge = [batch_gf]
+            if args.is_mix_gaze_estimation:
+                batches_to_merge.append(next(iter_eth))
+                batches_to_merge.append(next(iter_g360))
             
-        #     final_batch = merge_batches(batches_to_merge)
-        #     imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask, is_face_crop_mode, gaze3d, has_3d = final_batch
+            final_batch = merge_batches(batches_to_merge)
+            imgs, bboxes, eyes, gazex, gazey, inout, heights, widths, heatmaps, observer_expressions, gaze_directions, gaze_point_expressions, seg_mask, is_face_crop_mode, gaze3d, has_3d = final_batch
 
-        #     is_est = has_3d.bool().cuda()
-        #     is_gf = ~is_est
-        #     num_gf = is_gf.sum()
+            is_est = has_3d.bool().cuda()
+            is_gf = ~is_est
+            num_gf = is_gf.sum()
 
-        #     optimizer.zero_grad()
-        #     preds = model({
-        #         "images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, 
-        #         "observer_expression_ids": observer_expressions.cuda(), "gaze_point_expression_ids": gaze_point_expressions.cuda()
-        #     })
+            optimizer.zero_grad()
+            preds = model({
+                "images": imgs.cuda(), "bboxes": [[bbox] for bbox in bboxes], "eyes": eyes, 
+                "observer_expression_ids": observer_expressions.cuda(), "gaze_point_expression_ids": gaze_point_expressions.cuda()
+            })
             
-        #     loss = 0.0
-        #     # --- Heatmap Loss ---
-        #     if isinstance(preds['heatmap'], list): heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
-        #     else: heatmap_preds = preds['heatmap'].squeeze(dim=1)
-        #     pixel_loss = criterion_logits(heatmap_preds, heatmaps.cuda())
-        #     loss_per_sample_hm = pixel_loss.mean(dim=(1, 2))
+            loss = 0.0
+            # --- Heatmap Loss ---
+            if isinstance(preds['heatmap'], list): heatmap_preds = torch.stack(preds['heatmap']).squeeze(dim=1)
+            else: heatmap_preds = preds['heatmap'].squeeze(dim=1)
+            pixel_loss = criterion_logits(heatmap_preds, heatmaps.cuda())
+            loss_per_sample_hm = pixel_loss.mean(dim=(1, 2))
             
-        #     if num_gf > 0:
-        #         loss_hm_gf = loss_per_sample_hm[is_gf].mean()
-        #         loss += loss_hm_gf
+            if num_gf > 0:
+                loss_hm_gf = loss_per_sample_hm[is_gf].mean()
+                loss += loss_hm_gf
             
-        #     # (省略其他 Loss 计算以保持简洁，逻辑同你原代码)
-        #     if is_est.any():
-        #         loss += loss_per_sample_hm[is_est].mean() * 0.1
+            # 文本损失计算（根据 model.py 的 loss 返回值）
+            if 'text_loss' in preds and preds['text_loss'] is not None:
+                loss += preds['text_loss'].mean()
 
-        #     loss.backward()
-        #     optimizer.step()
-        #     pbar.set_postfix({'loss': loss.item()})
+            if is_est.any():
+                loss += loss_per_sample_hm[is_est].mean() * 0.1
+
+            loss.backward()
+            optimizer.step()
+            pbar.set_postfix({'loss': loss.item()})
 
         # ==========================================
         # 验证与可视化
@@ -279,30 +291,49 @@ def main():
             # --- 每一批次的第一个样本进行可视化保存 ---
             if cur_iter == 0:
                 idx_in_batch = 0
-                # 重要：根据你的 DataLoader 逻辑还原图片路径
-                # eval_dataset.data_idxs[idx] -> (img_idx, head_idx)
-                # eval_dataset.data[img_idx]['path']
                 global_idx = cur_iter * args.batch_size + idx_in_batch
                 img_idx, head_idx = eval_dataset.data_idxs[global_idx]
                 rel_path = eval_dataset.data[img_idx]['path']
                 img_full_path = os.path.join(eval_dataset.path, rel_path)
                 
+                cur_hm = heatmap_preds[idx_in_batch]
+                
+                cur_seg = None
+                if preds.get('seg') is not None:
+                    if isinstance(preds['seg'], list):
+                        cur_seg = preds['seg'][-1][idx_in_batch]
+                    else:
+                        cur_seg = preds['seg'][idx_in_batch]
+
+                # --- 文字映射逻辑 ---
+                # 原始 GT 文本
+                gt_ids = gaze_point_expressions[idx_in_batch]
+                gt_text = tokenizer.decode(gt_ids, skip_special_tokens=True)
+                
+                # 预测文本（从推理模式的 logits 反解）
+                pred_text = "N/A"
+                if 'text_logits' in preds and preds['text_logits'] is not None:
+                    # 简单贪婪解码：取最后一个时间步或序列最大概率
+                    logits = preds['text_logits'][idx_in_batch] # [Seq, Vocab]
+                    token_ids = torch.argmax(logits, dim=-1)
+                    pred_text = tokenizer.decode(token_ids, skip_special_tokens=True)
+
                 vis_preds = {
-                    'heatmap': heatmap_preds[idx_in_batch],
-                    'seg': preds['seg'][idx_in_batch] if preds.get('seg') is not None else None,
-                    'text': "GazeFollow Test Sample"
+                    'heatmap': cur_hm,
+                    'seg': cur_seg,
+                    'text': f"GT: {gt_text}\nPred: {pred_text}"
                 }
                 
-                vis_save_path = os.path.join(exp_dir, f"vis_epoch_{epoch}_batch_{cur_iter}.png")
-                # 传入对应索引的数据
+                vis_save_path = os.path.join(exp_dir, f"vis_epoch_{epoch}.png")
+                
                 visualize_step(
                     img_full_path, 
                     vis_preds, 
-                    [bboxes[idx_in_batch]], 
+                    bboxes[idx_in_batch],  # 确保这里是 [x1, y1, x2, y2]
                     [gazex[idx_in_batch][0], gazey[idx_in_batch][0]], 
                     vis_save_path
                 )
-                logger.info(f"Saved visualization: {vis_save_path}")
+                logger.info(f"Saved visualization to: {vis_save_path}")
 
             # 指标计算
             for i in range(heatmap_preds.shape[0]):

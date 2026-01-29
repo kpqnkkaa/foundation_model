@@ -1,0 +1,2 @@
+2026-01-29 00:32:53,649 - [Epoch 0 Evaluation]
+2026-01-29 00:32:58,833 - Saved visualization to: ./experiments/dinov2_vitb_lora_multi_output/2026-01-29_00-32-40/vis_epoch_0.png
