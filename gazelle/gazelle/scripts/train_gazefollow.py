@@ -130,8 +130,8 @@ def visualize_step(image_path, preds, bbox, gt_point, save_path):
             cy = (by1 + by2) / 2 * h
             
             # 绘制箭头
-            ax.arrow(cx, cy, dx, dy, color='yellow', width=w*0.005, head_width=w*0.02, 
-                     length_includes_head=True, label='Pred Dir')
+            ax.arrow(cx, cy, dx, dy, color='lime', width=w*0.005, head_width=w*0.02, 
+                    length_includes_head=True, label='Pred Dir')
 
     title_str = preds.get('text', "Gaze Detection Output")
     plt.title(f"{title_str}", fontsize=14, color='darkgreen', bbox=dict(facecolor='white', alpha=0.8))
