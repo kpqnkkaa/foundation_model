@@ -56,123 +56,117 @@ args = parser.parse_args()
 # ==========================================
 # 可视化核心函数
 # ==========================================
-def visualize_step(image_path, preds, bbox, gt_point, save_path, gt_mask):
+def visualize_comparison(image_path, bbox, 
+                         gt_point, gt_mask, gt_text, gt_dir_idx,
+                         pred_point, pred_mask, pred_text, pred_dir_idx,
+                         save_path):
+    """
+    左右对比可视化：
+    Left: Ground Truth (Red Theme) - 红色系
+    Right: Prediction (Blue Theme) - 蓝色系
+    """
+    # 1. 加载基础图像
     img = Image.open(image_path).convert('RGB')
     w, h = img.size
-    fig, ax = plt.subplots(1, figsize=(10, 10))
-    ax.imshow(img)
-
-    # 1. Observer BBox (蓝色) - bbox: [x1, y1, x2, y2] (Normalized)
-    bx1, by1, bx2, by2 = bbox
-    rect = patches.Rectangle((bx1*w, by1*h), (bx2-bx1)*w, (by2-by1)*h, 
-                             linewidth=3, edgecolor='blue', facecolor='none', label='Observer')
-    ax.add_patch(rect)
-
-    # 2. GT Point (蓝色圆点)
-    ax.scatter(gt_point[0]*w, gt_point[1]*h, c='blue', s=120, marker='o', edgecolors='white', label='GT')
-
-    # 3. Pred Point (绿色叉号)
-    if 'heatmap' in preds and preds['heatmap'] is not None:
-        hm = preds['heatmap'].detach().cpu().squeeze().numpy()
-        if hm.ndim > 2: hm = hm[0]
-        idx = np.unravel_index(np.argmax(hm), hm.shape)
-        # heatmap coordinate -> image coordinate
-        pred_y, pred_x = idx[0] * (h / hm.shape[0]), idx[1] * (w / hm.shape[1])
-        ax.scatter(pred_x, pred_y, c='lime', s=150, marker='x', linewidths=3, label='Pred Point')
-
-    # A. 绘制 GT Mask (蓝色, 透明度 0.4)
-    if gt_mask is not None:
-        # gt_mask 可能是 Tensor 或 numpy，确保转为 numpy [H, W]
-        if torch.is_tensor(gt_mask):
-            g_m = gt_mask.detach().cpu().squeeze().numpy()
-        else:
-            g_m = gt_mask
-            
-        if g_m.ndim == 3: g_m = g_m[0] # 防止多通道
-        
-        # Resize 到原图大小
-        g_m_resized = cv2.resize(g_m, (w, h), interpolation=cv2.INTER_NEAREST)
-        
-        # 制作蓝色遮罩
-        gt_overlay = np.zeros((h, w, 4))
-        gt_overlay[..., 2] = 1.0  # Blue 通道设为 1
-        # 使用 mask 作为 Alpha 通道，只显示 mask 区域
-        # 稍微容错一下，大于 0.5 算前景
-        gt_overlay[..., 3] = (g_m_resized > 0.5).astype(np.float32) * 0.3 # Alpha 0.3
-        
-        ax.imshow(gt_overlay, interpolation='nearest')
-
-    # B. 绘制 Pred Mask (绿色, 增强显示)
-    if 'seg' in preds and preds['seg'] is not None:
-        seg = torch.sigmoid(preds['seg']).detach().cpu().squeeze().numpy()
-        if seg.ndim == 3: seg = seg[0]
-        
-        seg_resized = cv2.resize(seg, (w, h))
-        
-        pred_overlay = np.zeros((h, w, 4))
-        pred_overlay[..., 1] = 1.0  # Green 通道
-        
-        # [修改点] 为了让 Pred 更明显:
-        # 1. 对概率进行阈值处理，过滤掉背景噪音 (比如 > 0.1 就显示)
-        # 2. 增加 Alpha 透明度到 0.6
-        valid_mask = (seg_resized > 0.1).astype(np.float32) 
-        pred_overlay[..., 3] = valid_mask * 0.6 # Alpha 0.6
-        
-        ax.imshow(pred_overlay, interpolation='nearest')
-
-    # 5. [修改] Direction Arrow (黄色箭头)
-    if 'direction' in preds and preds['direction'] is not None:
-        dir_data = preds['direction'].detach().cpu()
-        # 获取分类索引 (0-7)
-        if dir_data.ndim > 0 and dir_data.shape[-1] == 8:
-            dir_idx = torch.argmax(dir_data).item()
-        else:
-            dir_idx = dir_data.item()
-
-        # 定义每个 Label 对应的数学角度 (标准逆时针: 0度为右, 90度为上)
-        # Label定义: 0:R, 1:TR, 2:Top, 3:TL, 4:L, 5:BL, 6:Bottom, 7:BR
+    
+    # 2. 创建左右子图 (1行2列)
+    fig, axes = plt.subplots(1, 2, figsize=(16, 8))
+    
+    # --- 辅助函数：绘制方向箭头 ---
+    def draw_arrow(ax, cx, cy, dir_idx, color):
+        # 0:Right, 1:TR, 2:Up, 3:TL, 4:Left, 5:BL, 6:Down, 7:BR
         idx_to_angle = {
-            0: 0,    # Right
-            1: 45,   # Top-Right
-            2: 90,   # Above (Top)
-            3: 135,  # Top-Left
-            4: 180,  # Left
-            5: 225,  # Bottom-Left
-            6: 270,  # Below (Bottom)
-            7: 315   # Bottom-Right
+            0: 0, 1: 45, 2: 90, 3: 135, 
+            4: 180, 5: 225, 6: 270, 7: 315
         }
+        if dir_idx is not None and dir_idx != -100:
+            # 兼容 Tensor 或 int
+            d_i = dir_idx.item() if torch.is_tensor(dir_idx) else int(dir_idx)
+            
+            if d_i in idx_to_angle:
+                angle_deg = idx_to_angle[d_i]
+                angle_rad = math.radians(angle_deg)
+                arrow_len = w * 0.15
+                # 图像坐标系 Y 向下，往上(90度)需要负 dy
+                dx = math.cos(angle_rad) * arrow_len
+                dy = -math.sin(angle_rad) * arrow_len 
+                ax.arrow(cx, cy, dx, dy, color=color, width=w*0.005, head_width=w*0.02, 
+                         length_includes_head=True)
+
+    # 获取 Observer BBox 中心点 (用于画箭头起点)
+    bx1, by1, bx2, by2 = bbox # Normalized
+    cx, cy = (bx1 + bx2) / 2 * w, (by1 + by2) / 2 * h
+
+    # ==========================================
+    # LEFT Plot: Ground Truth (Red)
+    # ==========================================
+    ax = axes[0]
+    ax.imshow(img)
+    ax.set_title(f"Ground Truth\n{gt_text}", fontsize=12, color='darkred', wrap=True)
+    ax.axis('off')
+    
+    # 1. GT Observer Box (Red)
+    rect = patches.Rectangle((bx1*w, by1*h), (bx2-bx1)*w, (by2-by1)*h, 
+                             linewidth=2, edgecolor='red', facecolor='none')
+    ax.add_patch(rect)
+    
+    # 2. GT Point (Red Circle)
+    if gt_point is not None:
+        ax.scatter(gt_point[0]*w, gt_point[1]*h, c='red', s=100, marker='o', edgecolors='white', linewidth=2)
         
-        if dir_idx in idx_to_angle:
-            angle_deg = idx_to_angle[dir_idx]
-            angle_rad = math.radians(angle_deg)
+    # 3. GT Seg Mask (Red Overlay)
+    if gt_mask is not None:
+        if torch.is_tensor(gt_mask): g_m = gt_mask.detach().cpu().numpy()
+        else: g_m = gt_mask
+        if g_m.ndim == 3: g_m = g_m[0]
+        
+        # Resize 到原图
+        g_m_resized = cv2.resize(g_m, (w, h), interpolation=cv2.INTER_NEAREST)
+        overlay = np.zeros((h, w, 4))
+        overlay[..., 0] = 1.0 # R 通道
+        # Alpha: 只要 > 0.5 就算前景，透明度 0.4
+        overlay[..., 3] = (g_m_resized > 0.5).astype(np.float32) * 0.4
+        ax.imshow(overlay, interpolation='nearest')
+        
+    # 4. GT Direction (Red Arrow)
+    draw_arrow(ax, cx, cy, gt_dir_idx, 'red')
 
-            # 计算箭头长度 (图像宽度的 15%)
-            arrow_len = w * 0.15
-            
-            # 计算偏移量 (dx, dy)
-            # 注意: 图像坐标系中 y 是向下的，而 math.sin 假设 y 向上
-            # 所以 "Top/Above" (90度) 时 sin(90)=1, 我们需要 dy 为负值才能往上画
-            dx = math.cos(angle_rad) * arrow_len
-            dy = -math.sin(angle_rad) * arrow_len 
-
-            # 起点：BBox 中心
-            cx = (bx1 + bx2) / 2 * w
-            cy = (by1 + by2) / 2 * h
-            
-            # 绘制箭头
-            ax.arrow(cx, cy, dx, dy, color='lime', width=w*0.005, head_width=w*0.02, 
-                    length_includes_head=True, label='Pred Dir')
-
-    title_str = preds.get('text', "Gaze Detection Output")
-    plt.title(f"{title_str}", fontsize=14, color='darkgreen', bbox=dict(facecolor='white', alpha=0.8))
+    # ==========================================
+    # RIGHT Plot: Prediction (Blue)
+    # ==========================================
+    ax = axes[1]
+    ax.imshow(img)
+    ax.set_title(f"Prediction\n{pred_text}", fontsize=12, color='darkblue', wrap=True)
+    ax.axis('off')
     
-    # 整理图例
-    handles, labels = ax.get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
-    plt.legend(by_label.values(), by_label.keys(), loc='upper right')
+    # 1. Observer Box (Blue - 用于 Context)
+    rect = patches.Rectangle((bx1*w, by1*h), (bx2-bx1)*w, (by2-by1)*h, 
+                             linewidth=2, edgecolor='blue', facecolor='none')
+    ax.add_patch(rect)
     
-    plt.axis('off')
-    plt.savefig(save_path, bbox_inches='tight', pad_inches=0.1)
+    # 2. Pred Point (Blue Cross)
+    if pred_point is not None:
+        # pred_point 传入的是归一化坐标 [x_norm, y_norm]
+        ax.scatter(pred_point[0]*w, pred_point[1]*h, c='blue', s=150, marker='x', linewidth=3)
+        
+    # 3. Pred Seg Mask (Blue Overlay)
+    if pred_mask is not None:
+        if torch.is_tensor(pred_mask): p_m = pred_mask.detach().cpu().numpy()
+        else: p_m = pred_mask
+        if p_m.ndim == 3: p_m = p_m[0]
+        
+        p_m_resized = cv2.resize(p_m, (w, h))
+        overlay = np.zeros((h, w, 4))
+        overlay[..., 2] = 1.0 # B 通道
+        # Alpha: 强力显示，只要概率 > 0.1 就显示，透明度 0.6
+        overlay[..., 3] = (p_m_resized > 0.1).astype(np.float32) * 0.6
+        ax.imshow(overlay, interpolation='nearest')
+        
+    # 4. Pred Direction (Blue Arrow)
+    draw_arrow(ax, cx, cy, pred_dir_idx, 'blue')
+
+    plt.tight_layout()
+    plt.savefig(save_path, bbox_inches='tight', dpi=150)
     plt.close()
 
 # ==========================================

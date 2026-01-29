@@ -1,0 +1,4 @@
+2026-01-29 15:30:24,013 - Iter 0/1891 heatmap_loss: 0.6771, text_loss: 6.9613, direction_loss: 2.2407, seg_loss: 1.1196, total_loss: 1.3514
+2026-01-29 15:30:38,283 - Iter 10/1891 heatmap_loss: 0.0659, text_loss: 2.5958, direction_loss: 1.8878, seg_loss: 0.8755, total_loss: 0.5674
+2026-01-29 15:30:52,514 - Iter 20/1891 heatmap_loss: 0.0730, text_loss: 2.2755, direction_loss: 1.7371, seg_loss: 0.7219, total_loss: 0.4914
+2026-01-29 15:31:06,662 - Iter 30/1891 heatmap_loss: 0.0645, text_loss: 2.1719, direction_loss: 1.5649, seg_loss: 0.6942, total_loss: 0.4646
