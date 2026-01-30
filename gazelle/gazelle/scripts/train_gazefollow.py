@@ -34,7 +34,7 @@ from gazelle.model import get_gazelle_model
 from gazelle.utils import gazefollow_auc, gazefollow_l2
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default="dinov2_vitb_lora_multi_output")
+parser.add_argument('--model', type=str, default="dinov2_vitb_multi_input")
 parser.add_argument('--data_path', type=str, default='/mnt/nvme1n1/lululemon/xjj/datasets/resized/gazefollow_extended')
 parser.add_argument('--is_mix_gaze_estimation', default=False, action='store_true')
 parser.add_argument('--estimation_batch_size', type=int, default=64)
